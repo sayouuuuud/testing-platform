@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useTransition } from "react"
-import { Lock, LockOpen, Search, X, FileDown } from "lucide-react"
+import { Lock, LockOpen, Search, FileDown } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -207,13 +207,15 @@ export function ChecklistHeader({
                 <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-border">
                   <span className="eyebrow">Status Breakdown</span>
                   {statusFilter !== "all" && (
-                    <button
-                      onClick={() => onStatusFilterChange("all")}
-                      className="tag-mono text-muted-foreground hover:text-foreground flex items-center gap-1.5 transition-colors"
+                    <span
+                      className="tag-mono num-latin px-2 py-0.5 rounded-md"
+                      style={{
+                        color: STATUS_CONFIG[statusFilter].color,
+                        background: `color-mix(in oklch, ${STATUS_CONFIG[statusFilter].color} 12%, transparent)`,
+                      }}
                     >
-                      <X className="size-3" />
-                      clear
-                    </button>
+                      filtering · {STATUS_CONFIG[statusFilter].label}
+                    </span>
                   )}
                 </div>
 
@@ -270,7 +272,7 @@ export function ChecklistHeader({
 
               {/* Tiny caption */}
               <p className="tag-mono text-muted-foreground mt-3 px-1 text-start">
-                اضغط أي حالة لتصفية القائمة بالكامل
+                اضغط أي حالة لعرض بنودها فقط · اضغط مرة أخرى للعودة
               </p>
             </aside>
           </div>

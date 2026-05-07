@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState, useTransition } from "react"
+import { useEffect, useMemo, useState, useTransition } from "react"
 import { ChevronDown, MessageSquareText, Loader2, Plus, Minus } from "lucide-react"
 import type { ItemStatus, TestItem, TestPhase } from "@/lib/types"
 import { PHASE_LABELS } from "@/lib/status-config"
@@ -79,6 +79,16 @@ export function PhaseCard({
 
   const hidden =
     filteredSections.length === 0 && (statusFilter !== "all" || query.trim() !== "")
+
+  // Auto-expand phases when a filter or search is active so the user
+  // sees the matching items immediately without having to click each header.
+  useEffect(() => {
+    const isFiltering = statusFilter !== "all" || query.trim() !== ""
+    if (isFiltering && filteredSections.length > 0) {
+      setOpen(true)
+    }
+  }, [statusFilter, query, filteredSections.length])
+
   if (hidden) return null
 
   const chapterNum = String(phase.order_num).padStart(2, "0")
