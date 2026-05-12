@@ -165,7 +165,7 @@ export function ChecklistHeader({
 
               <p className="mt-6 max-w-lg text-base lg:text-lg leading-relaxed text-muted-foreground">
                 تتبُّع لحظي لجميع بنود الاختبار عبر{" "}
-                <span className="font-semibold text-foreground">11 مرحلة</span> —
+                <span className="font-semibold text-foreground">{phases.length} مرحلة</span> —
                 كل تحديث ينعكس فوراً لكل المختبرين المتصلين.
               </p>
 
