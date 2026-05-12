@@ -56,7 +56,7 @@ export function ChecklistHeader({
   const [password, setPassword] = useState("")
   const [pending, startTransition] = useTransition()
   const [exporting, setExporting] = useState(false)
-  const { theme, setTheme } = useTheme()
+  const { resolvedTheme, setTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
@@ -305,11 +305,11 @@ export function ChecklistHeader({
             <Button
               variant="outline"
               size="icon"
-              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+              onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
               className="rounded-md border-border-strong hover:text-primary transition-all size-10 shrink-0 bg-transparent"
-              title="تغيير المظهر"
+              title={resolvedTheme === "dark" ? "تفعيل الوضع المضيء" : "تفعيل الوضع المظلم"}
             >
-              {theme === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}
+              {resolvedTheme === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}
             </Button>
           )}
 
