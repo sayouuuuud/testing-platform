@@ -79,6 +79,71 @@
   --sidebar-ring: oklch(0.40 0.11 160);
 }
 
+.dark {
+  /* Canvas */
+  --background: oklch(0.14 0.01 220);        /* deep charcoal/slate */
+  --foreground: oklch(0.98 0.006 85);        /* off-white */
+
+  /* Surfaces */
+  --card: oklch(0.18 0.01 220);
+  --card-foreground: oklch(0.98 0.006 85);
+  --popover: oklch(0.18 0.01 220);
+  --popover-foreground: oklch(0.98 0.006 85);
+
+  /* Brand — emerald, slightly brighter for dark mode visibility */
+  --primary: oklch(0.60 0.14 160);
+  --primary-foreground: oklch(0.18 0.01 220);
+
+  --secondary: oklch(0.22 0.015 220);
+  --secondary-foreground: oklch(0.98 0.006 85);
+
+  --muted: oklch(0.22 0.015 220);
+  --muted-foreground: oklch(0.70 0.01 220);
+
+  --accent: oklch(0.25 0.015 220);
+  --accent-foreground: oklch(0.98 0.006 85);
+
+  /* Gold signature */
+  --gold: oklch(0.75 0.14 75);
+  --gold-foreground: oklch(0.18 0.01 220);
+
+  --destructive: oklch(0.65 0.18 25);
+  --destructive-foreground: oklch(0.98 0.006 85);
+
+  --border: oklch(0.25 0.01 220);
+  --border-strong: oklch(0.35 0.01 220);
+  --input: oklch(0.25 0.01 220);
+  --ring: oklch(0.60 0.14 160);
+
+  /* Status colors (solid + soft background pair) */
+  --status-pass: oklch(0.60 0.13 155);
+  --status-pass-soft: oklch(0.22 0.04 155);
+  --status-fail: oklch(0.65 0.19 25);
+  --status-fail-soft: oklch(0.25 0.04 25);
+  --status-blocked: oklch(0.70 0.15 55);
+  --status-blocked-soft: oklch(0.25 0.05 55);
+  --status-skip: oklch(0.65 0.02 240);
+  --status-skip-soft: oklch(0.22 0.005 240);
+  --status-pending: oklch(0.65 0.01 220);
+  --status-pending-soft: oklch(0.22 0.005 220);
+
+  /* Charts */
+  --chart-1: oklch(0.60 0.14 160);
+  --chart-2: oklch(0.75 0.14 75);
+  --chart-3: oklch(0.60 0.13 155);
+  --chart-4: oklch(0.65 0.19 25);
+  --chart-5: oklch(0.70 0.15 55);
+
+  --sidebar: oklch(0.18 0.01 220);
+  --sidebar-foreground: oklch(0.98 0.006 85);
+  --sidebar-primary: oklch(0.60 0.14 160);
+  --sidebar-primary-foreground: oklch(0.18 0.01 220);
+  --sidebar-accent: oklch(0.25 0.015 220);
+  --sidebar-accent-foreground: oklch(0.98 0.006 85);
+  --sidebar-border: oklch(0.25 0.01 220);
+  --sidebar-ring: oklch(0.60 0.14 160);
+}
+
 @theme inline {
   --font-sans: var(--font-sans);
   --font-display: var(--font-display);
