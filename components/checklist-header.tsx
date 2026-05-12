@@ -280,7 +280,14 @@ export function ChecklistHeader({
               {/* Tiny caption */}
               <p className="tag-mono text-muted-foreground mt-3 px-1 text-start">
                 اضغط أي حالة لعرض بنودها فقط · اضغط مرة أخرى للعودة
-div className="sticky top-0 z-40 border-y border-border bg-background/85 backdrop-blur-xl">
+              </p>
+            </aside>
+          </div>
+        </div>
+      </div>
+
+      {/* Sticky bar */}
+      <div className="sticky top-0 z-40 border-y border-border bg-background/85 backdrop-blur-xl">
         <div className="mx-auto max-w-[1320px] px-6 lg:px-10 py-3 flex items-center gap-3">
           <div className="relative flex-1">
             <Search className="absolute top-1/2 -translate-y-1/2 right-3.5 size-4 text-muted-foreground pointer-events-none" />
