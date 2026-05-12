@@ -158,7 +158,7 @@ export function ChecklistApp({ initialPhases, initialUnlocked }: Props) {
             <div className="lg:col-span-3">
               <div className="eyebrow mb-3">Issue</div>
               <p className="font-display text-2xl text-foreground">Vol. 01</p>
-              <p className="tag-mono text-muted-foreground mt-1">Phase One — 001</p>
+              <p className="tag-mono text-muted-foreground mt-1">Platform — 001</p>
               <p className="tag-mono text-muted-foreground mt-6 num-latin">
                 © {new Date().getFullYear()} ITQ Platform
               </p>

@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next"
 import { Fraunces, Cairo, JetBrains_Mono } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
 import { Toaster } from "@/components/ui/sonner"
+import { ThemeProvider } from "@/components/theme-provider"
 import "./globals.css"
 
 // Display — editorial serif with sharp character (variable font)
@@ -32,8 +33,10 @@ export const metadata: Metadata = {
 }
 
 export const viewport: Viewport = {
-  themeColor: "#FBF8F2",
-  colorScheme: "light",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#FBF8F2" },
+    { media: "(prefers-color-scheme: dark)", color: "#09090b" }
+  ],
 }
 
 export default function RootLayout({
@@ -46,20 +49,28 @@ export default function RootLayout({
       lang="ar"
       dir="rtl"
       className={`${fraunces.variable} ${cairo.variable} ${jetBrainsMono.variable}`}
+      suppressHydrationWarning
     >
       <body className="font-sans antialiased min-h-screen bg-background">
-        {children}
-        <Toaster
-          position="top-center"
-          toastOptions={{
-            style: {
-              background: "#fff",
-              border: "1px solid oklch(0.88 0.008 85)",
-              color: "oklch(0.18 0.01 220)",
-            },
-          }}
-        />
-        {process.env.NODE_ENV === "production" && <Analytics />}
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          {children}
+          <Toaster
+            position="top-center"
+            toastOptions={{
+              style: {
+                background: "var(--card)",
+                border: "1px solid var(--border)",
+                color: "var(--foreground)",
+              },
+            }}
+          />
+          {process.env.NODE_ENV === "production" && <Analytics />}
+        </ThemeProvider>
       </body>
     </html>
   )

@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react"
 import type { TestItem, TestSection } from "@/lib/types"
 import { ChecklistItem } from "./checklist-item"
-import { MessageSquareText, Plus, Minus } from "lucide-react"
+import { MessageSquareText, Plus, Minus, Loader2 } from "lucide-react"
 import { updateSectionNotes } from "@/app/actions"
 import { toast } from "sonner"
 

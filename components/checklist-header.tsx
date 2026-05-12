@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useTransition } from "react"
-import { Lock, LockOpen, Search, FileDown } from "lucide-react"
+import { useState, useTransition, useEffect } from "react"
+import { Lock, LockOpen, Search, X, FileDown, Moon, Sun } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -13,6 +13,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
+import { useTheme } from "next-themes"
 import { lockEditor, unlockEditor } from "@/app/actions"
 import { toast } from "sonner"
 import type { ItemStatus, TestPhase } from "@/lib/types"
@@ -55,6 +56,12 @@ export function ChecklistHeader({
   const [password, setPassword] = useState("")
   const [pending, startTransition] = useTransition()
   const [exporting, setExporting] = useState(false)
+  const { theme, setTheme } = useTheme()
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   const handleExport = () => {
     setExporting(true)
@@ -109,7 +116,7 @@ export function ChecklistHeader({
             <span className="text-border-strong">·</span>
             <span>Testing Journal</span>
             <span className="hidden sm:inline text-border-strong">·</span>
-            <span className="hidden sm:inline">Phase One</span>
+            <span className="hidden sm:inline">Platform</span>
           </div>
           <div className="flex items-center gap-3 tag-mono">
             <span className="flex items-center gap-2" style={{ color: "var(--status-pass)" }}>
@@ -153,7 +160,7 @@ export function ChecklistHeader({
               <h1 className="font-display display-hero text-foreground text-[clamp(2.5rem,7vw,5.5rem)]">
                 سجلّ الاختبار
                 <br />
-                <span className="text-gradient-emerald italic">Phase One.</span>
+                <span className="text-gradient-emerald italic">Platform.</span>
               </h1>
 
               <p className="mt-6 max-w-lg text-base lg:text-lg leading-relaxed text-muted-foreground">
@@ -273,16 +280,7 @@ export function ChecklistHeader({
               {/* Tiny caption */}
               <p className="tag-mono text-muted-foreground mt-3 px-1 text-start">
                 اضغط أي حالة لعرض بنودها فقط · اضغط مرة أخرى للعودة
-              </p>
-            </aside>
-          </div>
-        </div>
-      </div>
-
-      {/* ═══════════════════════════════════════════════════════════
-          Sticky toolbar — search + unlock
-          ═══════════════════════════════════════════════════════════ */}
-      <div className="sticky top-0 z-40 border-y border-border bg-background/85 backdrop-blur-xl">
+div className="sticky top-0 z-40 border-y border-border bg-background/85 backdrop-blur-xl">
         <div className="mx-auto max-w-[1320px] px-6 lg:px-10 py-3 flex items-center gap-3">
           <div className="relative flex-1">
             <Search className="absolute top-1/2 -translate-y-1/2 right-3.5 size-4 text-muted-foreground pointer-events-none" />
@@ -294,6 +292,19 @@ export function ChecklistHeader({
               className="w-full bg-card border border-border rounded-md py-2.5 px-4 pr-10 text-sm placeholder:text-muted-foreground/70 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
             />
           </div>
+
+          {/* Theme Toggle */}
+          {mounted && (
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+              className="rounded-md border-border-strong hover:text-primary transition-all size-10 shrink-0 bg-transparent"
+              title="تغيير المظهر"
+            >
+              {theme === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}
+            </Button>
+          )}
 
           {/* Export button */}
           <Button
