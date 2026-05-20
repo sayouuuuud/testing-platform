@@ -793,17 +793,17 @@ function UpdateEditorModal({
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 animate-fab-backdrop-in"
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onClose()
-      }}
       role="dialog"
       aria-modal="true"
       dir="rtl"
     >
-      {/* Backdrop */}
+      {/* Backdrop — clicking it closes the modal. It's a sibling of the
+          article (not an ancestor) so clicks inside the article never
+          reach this handler. */}
       <div
         aria-hidden
-        className="absolute inset-0 bg-foreground/40 backdrop-blur-sm"
+        onMouseDown={onClose}
+        className="absolute inset-0 bg-foreground/40 backdrop-blur-sm cursor-pointer"
       />
 
       <article
@@ -811,7 +811,6 @@ function UpdateEditorModal({
         style={{
           borderColor: `color-mix(in oklch, ${meta.color} 32%, var(--border))`,
         }}
-        onMouseDown={(e) => e.stopPropagation()}
       >
         <header
           className="flex items-center gap-3 px-6 py-4 border-b border-border"
