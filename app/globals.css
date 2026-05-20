@@ -435,3 +435,35 @@
 .pulse-dot {
   animation: pulse-dot 2s ease-in-out infinite;
 }
+
+/* Floating notepad popover — scales/slides up from the FAB. */
+@keyframes fab-popover-in {
+  0% {
+    opacity: 0;
+    transform: translateY(12px) scale(0.86);
+  }
+  60% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+.animate-fab-popover-in {
+  animation: fab-popover-in 0.34s cubic-bezier(0.22, 1.2, 0.36, 1) both;
+}
+
+@keyframes fab-picker-in {
+  0% {
+    opacity: 0;
+    transform: translateY(6px) scale(0.92);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+.animate-fab-picker-in {
+  animation: fab-picker-in 0.18s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
