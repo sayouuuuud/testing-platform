@@ -2,24 +2,37 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
-import type { TestItem, TestPhase, ItemStatus, TesterUpdate } from "@/lib/types"
+import type {
+  ChatMessage,
+  ItemStatus,
+  Profile,
+  TestItem,
+  TestPhase,
+  TesterUpdate,
+} from "@/lib/types"
 import { ChecklistHeader } from "./checklist-header"
 import { PhaseCard } from "./phase-card"
 import { TesterUpdatesFab } from "./tester-updates-fab"
+import { ChatFab } from "./chat/chat-fab"
+import { ItemPresenceProvider } from "./presence/item-presence-context"
 
 type Props = {
   initialPhases: TestPhase[]
-  initialUnlocked: boolean
   initialTesterUpdates: TesterUpdate[]
+  initialChatMessages: ChatMessage[]
+  profile: Profile | null
+  testers: Profile[]
 }
 
 export function ChecklistApp({
   initialPhases,
-  initialUnlocked,
   initialTesterUpdates,
+  initialChatMessages,
+  profile,
+  testers,
 }: Props) {
   const [phases, setPhases] = useState<TestPhase[]>(initialPhases)
-  const [unlocked, setUnlocked] = useState(initialUnlocked)
+  const unlocked = !!profile
   const [statusFilter, setStatusFilter] = useState<ItemStatus | "all">("all")
   const [query, setQuery] = useState("")
 
@@ -84,11 +97,11 @@ export function ChecklistApp({
   }
 
   return (
+    <ItemPresenceProvider profile={profile}>
     <div className="min-h-screen paper-bg">
       <ChecklistHeader
         stats={stats}
-        unlocked={unlocked}
-        onUnlockChange={setUnlocked}
+        profile={profile}
         statusFilter={statusFilter}
         onStatusFilterChange={setStatusFilter}
         query={query}
@@ -176,7 +189,16 @@ export function ChecklistApp({
       <TesterUpdatesFab
         initialUpdates={initialTesterUpdates}
         unlocked={unlocked}
+        profile={profile}
       />
+      {profile && (
+        <ChatFab
+          initialMessages={initialChatMessages}
+          profile={profile}
+          testers={testers}
+        />
+      )}
     </div>
+    </ItemPresenceProvider>
   )
 }

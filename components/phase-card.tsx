@@ -7,6 +7,8 @@ import { PHASE_LABELS } from "@/lib/status-config"
 import { SectionGroup } from "./section-group"
 import { updatePhaseNotes } from "@/app/actions"
 import { NotesChecklist } from "./notes-checklist"
+import { usePhaseNotesPresence } from "./presence/item-presence-context"
+import { EditingBadge } from "./presence/editing-badge"
 
 type Props = {
   phase: TestPhase
@@ -186,6 +188,7 @@ export function PhaseCard({
               <div className="flex items-center gap-2 text-muted-foreground">
                 <MessageSquareText className="size-4" />
                 <span className="tag-mono text-[11px] uppercase tracking-wider">Phase Notes</span>
+                <PhaseNotesPresenceBadge phaseId={phase.id} />
               </div>
               <button
                 onClick={() => setShowNotes(!showNotes)}
@@ -204,6 +207,7 @@ export function PhaseCard({
                   onSave={(value) => updatePhaseNotes(phase.id, value)}
                   addLabel="إضافة ملاحظة للمرحلة"
                   emptyLabel="لا توجد ملاحظات بعد — أضف أول عنصر لتتبع ما يخص هذه المرحلة"
+                  presenceTarget={{ kind: "phase_notes", id: phase.id }}
                 />
               </div>
             )}
@@ -272,4 +276,9 @@ function CircleProgress({ pct }: { pct: number }) {
       />
     </svg>
   )
+}
+
+function PhaseNotesPresenceBadge({ phaseId }: { phaseId: number }) {
+  const entries = usePhaseNotesPresence(phaseId)
+  return <EditingBadge entries={entries} />
 }

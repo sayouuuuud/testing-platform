@@ -6,6 +6,8 @@ import { ChecklistItem } from "./checklist-item"
 import { MessageSquareText, Plus, Minus } from "lucide-react"
 import { updateSectionNotes } from "@/app/actions"
 import { NotesChecklist } from "./notes-checklist"
+import { useSectionNotesPresence } from "./presence/item-presence-context"
+import { EditingBadge } from "./presence/editing-badge"
 
 type Props = {
   section: TestSection
@@ -71,6 +73,7 @@ export function SectionGroup({ section, unlocked, onLocalUpdate }: Props) {
           <div className="flex items-center gap-2 text-muted-foreground">
             <MessageSquareText className="size-3.5" />
             <span className="tag-mono text-[10px] uppercase tracking-wider">Section Notes</span>
+            <SectionNotesPresenceBadge sectionId={section.id} />
           </div>
           <button
             onClick={() => setShowNotes(!showNotes)}
@@ -89,6 +92,7 @@ export function SectionGroup({ section, unlocked, onLocalUpdate }: Props) {
               addLabel="إضافة ملاحظة للسيكشن"
               emptyLabel="لا توجد ملاحظات بعد"
               compact
+              presenceTarget={{ kind: "section_notes", id: section.id }}
             />
           </div>
         )}
@@ -106,4 +110,9 @@ export function SectionGroup({ section, unlocked, onLocalUpdate }: Props) {
       </ul>
     </div>
   )
+}
+
+function SectionNotesPresenceBadge({ sectionId }: { sectionId: number }) {
+  const entries = useSectionNotesPresence(sectionId)
+  return <EditingBadge entries={entries} />
 }

@@ -18,6 +18,7 @@ import {
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
 import type {
+  Profile,
   TesterUpdate,
   TesterUpdateCategory,
   TesterUpdateItem,
@@ -27,10 +28,12 @@ import {
   deleteTesterUpdate,
   updateTesterUpdate,
 } from "@/app/actions"
+import { TimeAgo } from "@/components/time-ago"
 
 type Props = {
   initialUpdates: TesterUpdate[]
   unlocked: boolean
+  profile?: Profile | null
 }
 
 type CategoryMeta = {
@@ -73,6 +76,9 @@ function normalizeItems(value: unknown): TesterUpdateItem[] {
       if (typeof obj.created_at === "string" && obj.created_at.length > 0) {
         item.created_at = obj.created_at
       }
+      if (typeof obj.updated_at === "string" && obj.updated_at.length > 0) {
+        item.updated_at = obj.updated_at
+      }
       out.push(item)
     }
   }
@@ -88,6 +94,7 @@ function normalizeRow(row: Record<string, unknown>): TesterUpdate {
     id: row.id as number,
     category: normalizeCategory(row.category),
     tester_name: (row.tester_name as string) ?? "",
+    tester_id: (row.tester_id as string) ?? null,
     items: normalizeItems(row.items),
     created_at: (row.created_at as string) ?? new Date().toISOString(),
     updated_at: (row.updated_at as string) ?? new Date().toISOString(),
@@ -155,7 +162,7 @@ async function copyToClipboard(text: string): Promise<boolean> {
   }
 }
 
-export function TesterUpdatesFab({ initialUpdates, unlocked }: Props) {
+export function TesterUpdatesFab({ initialUpdates, unlocked, profile = null }: Props) {
   const [open, setOpen] = useState(false)
   const [updates, setUpdates] = useState<TesterUpdate[]>(initialUpdates)
   const [filter, setFilter] = useState<FilterKey>("all")
@@ -283,7 +290,7 @@ export function TesterUpdatesFab({ initialUpdates, unlocked }: Props) {
       toast.error("التعديل مقفول — افتحه من الأعلى أولاً")
       return
     }
-    const res = await createTesterUpdate(category, "")
+    const res = await createTesterUpdate(category)
     if (res.ok && res.update) {
       setUpdates((prev) => {
         if (prev.some((u) => u.id === res.update!.id)) return prev
@@ -571,6 +578,7 @@ export function TesterUpdatesFab({ initialUpdates, unlocked }: Props) {
           key={activeUpdate.id}
           update={activeUpdate}
           unlocked={unlocked}
+          profile={profile}
           onClose={() => setActiveId(null)}
           onLocalUpdate={handleUpdateLocal}
           onDelete={handleDelete}
@@ -725,27 +733,36 @@ function UpdateRow({
 function UpdateEditorModal({
   update,
   unlocked,
+  profile,
   onClose,
   onLocalUpdate,
   onDelete,
 }: {
   update: TesterUpdate
   unlocked: boolean
+  profile: Profile | null
   onClose: () => void
   onLocalUpdate: (id: number, patch: Partial<TesterUpdate>) => void
   onDelete: (id: number) => void
 }) {
   const meta = CATEGORY_META[update.category]
   const Icon = meta.icon
-  const [testerName, setTesterName] = useState(update.tester_name)
+  // — tester_name is now derived from the signed-in user; the field is
+  // shown read-only so the card remembers who originally created it.
+  const testerName = profile?.display_name || update.tester_name
   const [items, setItems] = useState<TesterUpdateItem[]>(update.items)
   const [savePending, startSaveTransition] = useTransition()
   const focusIndexRef = useRef<number | null>(null)
-  const inputRefs = useRef<Array<HTMLInputElement | null>>([])
+  const inputRefs = useRef<Array<HTMLTextAreaElement | null>>([])
   const baselineRef = useRef({
-    tester_name: update.tester_name,
     items: JSON.stringify(update.items),
   })
+
+  const autosize = (el: HTMLTextAreaElement | null) => {
+    if (!el) return
+    el.style.height = "auto"
+    el.style.height = `${el.scrollHeight}px`
+  }
 
   // Sync from upstream (realtime) when this row changes externally and
   // the user isn't currently typing in this card.
@@ -762,34 +779,27 @@ function UpdateEditorModal({
   }, [update.items])
 
   useEffect(() => {
-    if (update.tester_name === baselineRef.current.tester_name) return
-    const activeEl =
-      typeof document !== "undefined" ? document.activeElement : null
-    if (activeEl?.getAttribute("data-card-name") !== String(update.id)) {
-      setTesterName(update.tester_name)
-      baselineRef.current.tester_name = update.tester_name
-    }
-  }, [update.tester_name, update.id])
-
-  useEffect(() => {
     if (focusIndexRef.current === null) return
     const el = inputRefs.current[focusIndexRef.current]
-    if (el) el.focus()
+    if (el) {
+      el.focus()
+      autosize(el)
+    }
     focusIndexRef.current = null
   }, [items.length])
 
-  const persist = (patch: { items?: TesterUpdateItem[]; tester_name?: string }) => {
+  // Re-autosize every textarea when items change.
+  useEffect(() => {
+    for (const el of inputRefs.current) autosize(el)
+  }, [items])
+
+  const persist = (patch: { items?: TesterUpdateItem[] }) => {
     if (!unlocked) return
-    const payload: { items?: TesterUpdateItem[]; tester_name?: string } = {}
+    const payload: { items?: TesterUpdateItem[] } = {}
     if (patch.items !== undefined) {
       const serialized = JSON.stringify(patch.items)
       if (serialized !== baselineRef.current.items) {
         payload.items = patch.items
-      }
-    }
-    if (patch.tester_name !== undefined) {
-      if (patch.tester_name !== baselineRef.current.tester_name) {
-        payload.tester_name = patch.tester_name
       }
     }
     if (Object.keys(payload).length === 0) return
@@ -798,9 +808,6 @@ function UpdateEditorModal({
       const res = await updateTesterUpdate(update.id, payload)
       if (res.ok) {
         if (payload.items) baselineRef.current.items = JSON.stringify(payload.items)
-        if (payload.tester_name !== undefined) {
-          baselineRef.current.tester_name = payload.tester_name
-        }
         onLocalUpdate(update.id, payload)
       } else {
         toast.error(res.error || "فشل حفظ البطاقة")
@@ -852,8 +859,8 @@ function UpdateEditorModal({
     persist({ items: trimmed })
   }
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, idx: number) => {
-    if (e.key === "Enter") {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>, idx: number) => {
+    if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault()
       persist({ items })
       focusIndexRef.current = idx + 1
@@ -968,21 +975,24 @@ function UpdateEditorModal({
           </button>
         </header>
 
-        <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6">
+        <div
+          className="flex-1 overflow-y-auto px-6 py-6 space-y-6"
+          onWheel={(e) => {
+            // Keep wheel events inside the modal so hovering a textarea
+            // never steals scroll from the modal viewport.
+            e.stopPropagation()
+          }}
+        >
           <div>
             <label className="block tag-mono text-[10px] text-muted-foreground mb-1.5">
               اسم التيستر
             </label>
-            <input
-              type="text"
-              data-card-name={update.id}
-              value={testerName}
-              onChange={(e) => setTesterName(e.target.value)}
-              onBlur={() => persist({ tester_name: testerName })}
-              disabled={!unlocked}
-              placeholder="مين اللي بيكتب الملاحظة؟"
-              className="w-full bg-transparent text-lg font-display font-semibold focus:outline-none border-b border-border focus:border-primary py-2.5 transition-colors disabled:opacity-60"
-            />
+            <div className="w-full bg-transparent text-lg font-display font-semibold border-b border-border py-2.5 flex items-center justify-between gap-2 text-foreground">
+              <span>{testerName || "بدون اسم"}</span>
+              <span className="tag-mono text-[10px] text-muted-foreground">
+                مرتبط بالبروفايل
+              </span>
+            </div>
           </div>
 
           <div>
@@ -1035,29 +1045,39 @@ function UpdateEditorModal({
                       </button>
 
                       <div className="flex-1 min-w-0">
-                        <input
+                        <textarea
                           ref={(el) => {
                             inputRefs.current[idx] = el
+                            autosize(el)
                           }}
-                          type="text"
+                          rows={1}
                           value={item.text}
-                          onChange={(e) => updateText(idx, e.target.value)}
+                          onChange={(e) => {
+                            updateText(idx, e.target.value)
+                            autosize(e.currentTarget)
+                          }}
                           onBlur={handleItemBlur}
                           onKeyDown={(e) => handleKeyDown(e, idx)}
                           disabled={!unlocked}
-                          placeholder="اكتب الملاحظة..."
-                          className={`w-full bg-transparent text-base focus:outline-none border-b border-transparent focus:border-border py-1.5 leading-relaxed transition-colors disabled:opacity-60 ${
+                          placeholder="اكتب الملاحظة... (Shift+Enter لسطر جديد)"
+                          className={`w-full bg-transparent text-base focus:outline-none border-b border-transparent focus:border-border py-1.5 leading-relaxed transition-colors disabled:opacity-60 resize-none overflow-hidden break-words whitespace-pre-wrap ${
                             item.done
                               ? "line-through text-muted-foreground"
                               : "text-foreground"
                           }`}
                         />
-                        {dateLabel && (
-                          <span className="inline-flex items-center gap-1 tag-mono text-[10px] text-muted-foreground num-latin mt-1">
-                            <Calendar className="size-2.5" />
-                            {dateLabel}
-                          </span>
-                        )}
+                        <div className="flex items-center gap-3 flex-wrap mt-1">
+                          {dateLabel && (
+                            <span className="inline-flex items-center gap-1 tag-mono text-[10px] text-muted-foreground num-latin">
+                              <Calendar className="size-2.5" />
+                              {dateLabel}
+                            </span>
+                          )}
+                          <TimeAgo
+                            iso={item.updated_at ?? item.created_at}
+                            className="tag-mono text-[10px] text-muted-foreground"
+                          />
+                        </div>
                       </div>
 
                       {unlocked && (
