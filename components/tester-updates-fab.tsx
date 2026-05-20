@@ -5,10 +5,9 @@ import {
   AlertOctagon,
   Bug,
   Check,
-  ChevronDown,
-  Lightbulb,
+  ChevronRight,
   Loader2,
-  MessageCircle,
+  NotebookPen,
   Plus,
   Sparkles,
   Trash2,
@@ -38,25 +37,25 @@ type CategoryMeta = {
   icon: typeof Sparkles
   color: string
   softBg: string
-  description: string
+  ringBg: string
 }
 
 const CATEGORY_META: Record<TesterUpdateCategory, CategoryMeta> = {
   update: {
-    label: "تحديثات مستقبلية",
+    label: "تحديثات",
     short: "تحديث",
     icon: Sparkles,
     color: "var(--primary)",
-    softBg: "color-mix(in oklch, var(--primary) 12%, transparent)",
-    description: "أفكار وتحسينات تحب تضيفها على المنصة لاحقاً",
+    softBg: "color-mix(in oklch, var(--primary) 14%, transparent)",
+    ringBg: "color-mix(in oklch, var(--primary) 32%, transparent)",
   },
   general_error: {
     label: "أخطاء عامة",
-    short: "خطأ عام",
+    short: "خطأ",
     icon: AlertOctagon,
     color: "var(--status-fail)",
-    softBg: "color-mix(in oklch, var(--status-fail) 12%, transparent)",
-    description: "أخطاء عامة غير مرتبطة ببند اختبار بعينه",
+    softBg: "color-mix(in oklch, var(--status-fail) 14%, transparent)",
+    ringBg: "color-mix(in oklch, var(--status-fail) 32%, transparent)",
   },
 }
 
@@ -96,8 +95,9 @@ export function TesterUpdatesFab({ initialUpdates, unlocked }: Props) {
   const [open, setOpen] = useState(false)
   const [updates, setUpdates] = useState<TesterUpdate[]>(initialUpdates)
   const [filter, setFilter] = useState<FilterKey>("all")
+  // null = no picker; otherwise shows the inline category picker.
   const [picker, setPicker] = useState(false)
-  const pickerRef = useRef<HTMLDivElement>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
 
   // Realtime sync — pick up rows added/edited/deleted in other tabs.
   useEffect(() => {
@@ -135,17 +135,29 @@ export function TesterUpdatesFab({ initialUpdates, unlocked }: Props) {
     }
   }, [])
 
-  // Close the picker on outside click.
+  // Close the entire popover on outside click / Escape.
   useEffect(() => {
-    if (!picker) return
-    const handler = (e: MouseEvent) => {
-      if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) {
+    if (!open) return
+    const handlePointer = (e: MouseEvent) => {
+      if (!containerRef.current) return
+      if (!containerRef.current.contains(e.target as Node)) {
+        setOpen(false)
         setPicker(false)
       }
     }
-    window.addEventListener("mousedown", handler)
-    return () => window.removeEventListener("mousedown", handler)
-  }, [picker])
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setOpen(false)
+        setPicker(false)
+      }
+    }
+    window.addEventListener("mousedown", handlePointer)
+    window.addEventListener("keydown", handleKey)
+    return () => {
+      window.removeEventListener("mousedown", handlePointer)
+      window.removeEventListener("keydown", handleKey)
+    }
+  }, [open])
 
   const filteredUpdates = useMemo(() => {
     if (filter === "all") return updates
@@ -180,7 +192,6 @@ export function TesterUpdatesFab({ initialUpdates, unlocked }: Props) {
         return [res.update!, ...prev]
       })
       setFilter(category)
-      setOpen(true)
     } else {
       toast.error(res.error || "تعذر إنشاء البطاقة")
     }
@@ -205,133 +216,61 @@ export function TesterUpdatesFab({ initialUpdates, unlocked }: Props) {
   }
 
   return (
-    <>
-      {/* ── Floating button ── */}
-      <div
-        className="fixed z-40 bottom-6 end-6 flex flex-col items-end gap-3"
-        dir="ltr"
-      >
-        {picker && (
-          <div
-            ref={pickerRef}
-            className="rounded-2xl border border-border bg-card shadow-2xl p-2 w-64 animate-in fade-in slide-in-from-bottom-2 duration-200"
-            dir="rtl"
-          >
-            <div className="px-3 py-2 tag-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-              إضافة جديدة
-            </div>
-            {(Object.keys(CATEGORY_META) as TesterUpdateCategory[]).map((key) => {
-              const meta = CATEGORY_META[key]
-              const Icon = meta.icon
-              return (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => handleCreate(key)}
-                  className="w-full flex items-start gap-3 p-3 rounded-xl hover:bg-muted transition-colors text-right"
-                >
-                  <span
-                    className="size-9 rounded-lg flex items-center justify-center shrink-0"
-                    style={{ background: meta.softBg, color: meta.color }}
-                  >
-                    <Icon className="size-4" />
-                  </span>
-                  <span className="flex-1 min-w-0">
-                    <span className="block font-display font-semibold text-sm text-foreground">
-                      {meta.label}
-                    </span>
-                    <span className="block text-[11px] text-muted-foreground leading-snug mt-0.5">
-                      {meta.description}
-                    </span>
-                  </span>
-                </button>
-              )
-            })}
-          </div>
-        )}
-
-        <button
-          type="button"
-          onClick={() => {
-            if (open) {
-              setOpen(false)
-            } else {
-              setOpen(true)
-            }
-            setPicker(false)
-          }}
-          className="relative size-14 rounded-full shadow-2xl flex items-center justify-center transition-transform hover:scale-105 active:scale-95"
-          style={{
-            background:
-              "linear-gradient(135deg, var(--primary), color-mix(in oklch, var(--primary) 70%, var(--gold)))",
-            color: "var(--primary-foreground)",
-          }}
-          aria-label={open ? "إغلاق لوحة التحديثات" : "فتح لوحة التحديثات"}
+    <div
+      ref={containerRef}
+      className="fixed z-50 bottom-6 end-6 flex flex-col items-end gap-3"
+      dir="ltr"
+    >
+      {/* ── Anchored floating popover (replaces the old side-drawer) ── */}
+      {open && (
+        <div
+          className="origin-bottom-right will-change-transform animate-fab-popover-in"
+          dir="rtl"
         >
-          {open ? (
-            <X className="size-6" />
-          ) : (
-            <MessageCircle className="size-6" />
-          )}
-          {!open && counts.openItems > 0 && (
-            <span
-              className="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-full tag-mono text-[10px] flex items-center justify-center num-latin shadow-md"
+          <div className="w-[min(92vw,380px)] max-h-[min(75vh,560px)] rounded-2xl border border-border bg-card shadow-2xl flex flex-col overflow-hidden backdrop-blur-md">
+            {/* Header */}
+            <header
+              className="px-4 pt-4 pb-3 border-b border-border"
               style={{
-                background: "var(--status-fail)",
-                color: "var(--primary-foreground)",
+                background:
+                  "linear-gradient(135deg, color-mix(in oklch, var(--primary) 8%, var(--card)), var(--card))",
               }}
             >
-              {counts.openItems}
-            </span>
-          )}
-        </button>
-      </div>
-
-      {/* ── Side panel ── */}
-      {open && (
-        <div className="fixed inset-0 z-50 flex" dir="rtl">
-          {/* Backdrop */}
-          <button
-            type="button"
-            aria-label="إغلاق"
-            onClick={() => setOpen(false)}
-            className="flex-1 bg-foreground/30 backdrop-blur-sm animate-in fade-in duration-200"
-          />
-
-          <aside className="w-full max-w-md h-full bg-background border-s border-border shadow-2xl flex flex-col animate-in slide-in-from-right duration-300">
-            <header className="px-5 py-4 border-b border-border bg-card">
               <div className="flex items-center justify-between gap-3 mb-3">
-                <div className="flex items-center gap-2.5">
+                <div className="flex items-center gap-2.5 min-w-0">
                   <span
-                    className="size-9 rounded-lg flex items-center justify-center"
+                    className="size-9 rounded-lg flex items-center justify-center shrink-0 shadow-sm"
                     style={{
                       background:
-                        "color-mix(in oklch, var(--primary) 14%, transparent)",
-                      color: "var(--primary)",
+                        "linear-gradient(135deg, var(--primary), color-mix(in oklch, var(--primary) 60%, var(--gold)))",
+                      color: "var(--primary-foreground)",
                     }}
                   >
-                    <Lightbulb className="size-4" />
+                    <NotebookPen className="size-4" />
                   </span>
-                  <div className="flex flex-col leading-tight">
-                    <span className="font-display font-semibold text-lg text-foreground">
+                  <div className="flex flex-col leading-tight min-w-0">
+                    <span className="font-display font-semibold text-base text-foreground truncate">
                       دفتر الملاحظات
                     </span>
-                    <span className="tag-mono text-[10px] text-muted-foreground">
-                      Notepad — Updates &amp; General Errors
+                    <span className="tag-mono text-[9px] text-muted-foreground truncate">
+                      Notepad — Updates &amp; Errors
                     </span>
                   </div>
                 </div>
                 <button
                   type="button"
-                  onClick={() => setOpen(false)}
-                  className="size-9 rounded-full hover:bg-muted flex items-center justify-center transition-colors"
+                  onClick={() => {
+                    setOpen(false)
+                    setPicker(false)
+                  }}
+                  className="size-8 rounded-full hover:bg-muted flex items-center justify-center transition-colors shrink-0"
                   aria-label="إغلاق"
                 >
                   <X className="size-4" />
                 </button>
               </div>
 
-              <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex items-center gap-1.5 flex-wrap">
                 <FilterPill
                   active={filter === "all"}
                   onClick={() => setFilter("all")}
@@ -349,7 +288,7 @@ export function TesterUpdatesFab({ initialUpdates, unlocked }: Props) {
                 <FilterPill
                   active={filter === "general_error"}
                   onClick={() => setFilter("general_error")}
-                  label="أخطاء عامة"
+                  label="أخطاء"
                   count={counts.errorCount}
                   color="var(--status-fail)"
                   icon={Bug}
@@ -357,17 +296,18 @@ export function TesterUpdatesFab({ initialUpdates, unlocked }: Props) {
               </div>
             </header>
 
-            <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
+            {/* List */}
+            <div className="flex-1 overflow-y-auto px-3 py-3 space-y-2.5 min-h-[160px]">
               {filteredUpdates.length === 0 ? (
                 <EmptyState
                   unlocked={unlocked}
                   onPick={() => setPicker(true)}
                   hint={
                     filter === "all"
-                      ? "لسه ما فيش حاجة هنا — اضغط + عشان تضيف أول بطاقة"
-                      : `لا توجد ${
-                          filter === "update" ? "تحديثات" : "أخطاء عامة"
-                        } مسجلة بعد`
+                      ? "لسه ما فيش حاجة هنا"
+                      : filter === "update"
+                      ? "لا توجد تحديثات مسجلة بعد"
+                      : "لا توجد أخطاء عامة مسجلة بعد"
                   }
                 />
               ) : (
@@ -383,35 +323,126 @@ export function TesterUpdatesFab({ initialUpdates, unlocked }: Props) {
               )}
             </div>
 
-            <footer className="border-t border-border bg-card px-4 py-3 flex items-center justify-between">
+            {/* Footer */}
+            <footer className="border-t border-border bg-card/80 px-3 py-2.5 flex items-center justify-between gap-2">
               <span className="tag-mono text-[10px] text-muted-foreground num-latin">
                 {counts.total} بطاقة · {counts.openItems} عنصر مفتوح
               </span>
               <div className="relative">
+                {/* Inline category picker that slides up above the Add button */}
+                {picker && (
+                  <div
+                    className="absolute bottom-full end-0 mb-2 w-60 rounded-xl border border-border bg-card shadow-2xl p-1.5 origin-bottom-right animate-fab-picker-in"
+                    onMouseDown={(e) => e.stopPropagation()}
+                  >
+                    {(Object.keys(CATEGORY_META) as TesterUpdateCategory[]).map(
+                      (key) => {
+                        const meta = CATEGORY_META[key]
+                        const Icon = meta.icon
+                        return (
+                          <button
+                            key={key}
+                            type="button"
+                            onClick={() => handleCreate(key)}
+                            className="w-full flex items-center gap-2.5 p-2.5 rounded-lg hover:bg-muted transition-colors text-right group"
+                          >
+                            <span
+                              className="size-8 rounded-lg flex items-center justify-center shrink-0 transition-transform group-hover:scale-105"
+                              style={{ background: meta.softBg, color: meta.color }}
+                            >
+                              <Icon className="size-4" />
+                            </span>
+                            <span className="flex-1 min-w-0 text-right">
+                              <span className="block font-display font-semibold text-sm text-foreground">
+                                {meta.label}
+                              </span>
+                              <span className="block text-[10px] text-muted-foreground leading-tight mt-0.5">
+                                {key === "update"
+                                  ? "تحسينات وأفكار مستقبلية"
+                                  : "أخطاء غير مرتبطة ببند"}
+                              </span>
+                            </span>
+                            <ChevronRight className="size-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                          </button>
+                        )
+                      },
+                    )}
+                  </div>
+                )}
+
                 <button
                   type="button"
                   onClick={() => setPicker((v) => !v)}
                   disabled={!unlocked}
-                  className="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-full text-sm font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-md active:scale-95"
                   style={{
                     background: "var(--primary)",
                     color: "var(--primary-foreground)",
                   }}
                 >
-                  <Plus className="size-4" />
-                  إضافة بطاقة
-                  <ChevronDown
-                    className={`size-3 transition-transform ${
-                      picker ? "rotate-180" : ""
+                  <Plus
+                    className={`size-3.5 transition-transform duration-200 ${
+                      picker ? "rotate-45" : ""
                     }`}
                   />
+                  إضافة
                 </button>
               </div>
             </footer>
-          </aside>
+          </div>
         </div>
       )}
-    </>
+
+      {/* ── Floating action button ── */}
+      <button
+        type="button"
+        onClick={() => {
+          if (open) {
+            setOpen(false)
+            setPicker(false)
+          } else {
+            setOpen(true)
+          }
+        }}
+        className="group relative size-14 rounded-2xl shadow-2xl flex items-center justify-center transition-all duration-300 hover:scale-105 active:scale-95 hover:rotate-3"
+        style={{
+          background:
+            "linear-gradient(135deg, var(--primary), color-mix(in oklch, var(--primary) 55%, var(--gold)))",
+          color: "var(--primary-foreground)",
+        }}
+        aria-label={open ? "إغلاق دفتر الملاحظات" : "فتح دفتر الملاحظات"}
+      >
+        {/* Soft glow */}
+        <span
+          aria-hidden
+          className="absolute inset-0 rounded-2xl blur-xl opacity-40 transition-opacity group-hover:opacity-70 -z-10"
+          style={{
+            background:
+              "linear-gradient(135deg, var(--primary), color-mix(in oklch, var(--primary) 55%, var(--gold)))",
+          }}
+        />
+
+        <span
+          className={`transition-all duration-300 ${
+            open ? "rotate-90 scale-90" : "rotate-0 scale-100"
+          }`}
+        >
+          {open ? <X className="size-5" /> : <NotebookPen className="size-5" />}
+        </span>
+
+        {!open && counts.openItems > 0 && (
+          <span
+            className="absolute -top-1.5 -right-1.5 min-w-5 h-5 px-1 rounded-full tag-mono text-[10px] flex items-center justify-center num-latin shadow-md border-2 border-background"
+            style={{
+              background: "var(--status-fail)",
+              color: "var(--primary-foreground)",
+            }}
+          >
+            {counts.openItems}
+          </span>
+        )}
+      </button>
+    </div>
   )
 }
 
@@ -434,7 +465,7 @@ function FilterPill({
     <button
       type="button"
       onClick={onClick}
-      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-medium transition-colors border"
+      className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-medium transition-colors border"
       style={{
         background: active
           ? color
@@ -449,9 +480,9 @@ function FilterPill({
           : "var(--border)",
       }}
     >
-      {Icon && <Icon className="size-3" />}
+      {Icon && <Icon className="size-2.5" />}
       {label}
-      <span className="tag-mono num-latin opacity-70">{count}</span>
+      <span className="tag-mono num-latin opacity-70 text-[10px]">{count}</span>
     </button>
   )
 }
@@ -466,35 +497,35 @@ function EmptyState({
   hint: string
 }) {
   return (
-    <div className="flex flex-col items-center justify-center text-center py-16 px-6 gap-4">
+    <div className="flex flex-col items-center justify-center text-center py-8 px-4 gap-3">
       <span
-        className="size-16 rounded-2xl flex items-center justify-center"
+        className="size-12 rounded-2xl flex items-center justify-center"
         style={{
           background: "color-mix(in oklch, var(--primary) 10%, transparent)",
           color: "var(--primary)",
         }}
       >
-        <Lightbulb className="size-7" />
+        <NotebookPen className="size-5" />
       </span>
-      <p className="text-sm text-muted-foreground leading-relaxed max-w-xs">
+      <p className="text-xs text-muted-foreground leading-relaxed max-w-[220px]">
         {hint}
       </p>
       {!unlocked && (
-        <p className="text-[11px] tag-mono text-muted-foreground">
-          افتح وضع التعديل لإضافة بطاقات جديدة
+        <p className="text-[10px] tag-mono text-muted-foreground">
+          افتح وضع التعديل لإضافة بطاقات
         </p>
       )}
       <button
         type="button"
         onClick={onPick}
         disabled={!unlocked}
-        className="mt-2 flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+        className="mt-1 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-md active:scale-95"
         style={{
           background: "var(--primary)",
           color: "var(--primary-foreground)",
         }}
       >
-        <Plus className="size-4" /> ابدأ بطاقة جديدة
+        <Plus className="size-3.5" /> ابدأ بطاقة جديدة
       </button>
     </div>
   )
@@ -647,47 +678,47 @@ function UpdateCard({
 
   return (
     <article
-      className="rounded-xl border bg-card overflow-hidden transition-shadow hover:shadow-md"
+      className="rounded-xl border bg-card overflow-hidden transition-all hover:shadow-md animate-in fade-in slide-in-from-top-1 duration-200"
       style={{
         borderColor: `color-mix(in oklch, ${meta.color} 28%, var(--border))`,
       }}
     >
       <header
-        className="flex items-center gap-2 px-3 py-2 border-b border-border"
+        className="flex items-center gap-2 px-2.5 py-1.5 border-b border-border"
         style={{ background: meta.softBg }}
       >
         <span
-          className="size-7 rounded-md flex items-center justify-center shrink-0"
+          className="size-6 rounded-md flex items-center justify-center shrink-0"
           style={{
-            background: `color-mix(in oklch, ${meta.color} 22%, transparent)`,
+            background: `color-mix(in oklch, ${meta.color} 24%, transparent)`,
             color: meta.color,
           }}
         >
-          <Icon className="size-3.5" />
+          <Icon className="size-3" />
         </span>
         <span
-          className="tag-mono text-[10px] uppercase tracking-wider"
+          className="tag-mono text-[9px] uppercase tracking-wider"
           style={{ color: meta.color }}
         >
           {meta.short}
         </span>
-        <span className="tag-mono text-[10px] text-muted-foreground num-latin ms-auto">
+        <span className="tag-mono text-[9px] text-muted-foreground num-latin ms-auto">
           {doneCount}/{totalCount}
         </span>
         {unlocked && (
           <button
             type="button"
             onClick={() => onDelete(update.id)}
-            className="size-7 rounded-md hover:bg-foreground/5 flex items-center justify-center transition-colors text-muted-foreground hover:text-[var(--status-fail)]"
+            className="size-6 rounded-md hover:bg-foreground/5 flex items-center justify-center transition-colors text-muted-foreground hover:text-[var(--status-fail)]"
             aria-label="حذف البطاقة"
             title="حذف البطاقة"
           >
-            <Trash2 className="size-3.5" />
+            <Trash2 className="size-3" />
           </button>
         )}
       </header>
 
-      <div className="px-3 py-3 space-y-3">
+      <div className="px-2.5 py-2.5 space-y-2">
         <input
           type="text"
           data-card-name={update.id}
@@ -696,23 +727,23 @@ function UpdateCard({
           onBlur={() => persist({ tester_name: testerName })}
           disabled={!unlocked}
           placeholder="اسم التيستر..."
-          className="w-full bg-transparent text-sm font-display font-semibold focus:outline-none border-b border-border focus:border-primary py-1.5 transition-colors disabled:opacity-60"
+          className="w-full bg-transparent text-sm font-display font-semibold focus:outline-none border-b border-border focus:border-primary py-1 transition-colors disabled:opacity-60"
         />
 
         {items.length === 0 ? (
-          <p className="text-xs text-muted-foreground italic">
-            لا توجد عناصر بعد — اضغط + لإضافة أول عنصر
+          <p className="text-[11px] text-muted-foreground italic">
+            اضغط + لإضافة عنصر
           </p>
         ) : (
-          <ul className="space-y-1.5">
+          <ul className="space-y-1">
             {items.map((item, idx) => (
-              <li key={idx} className="flex items-center gap-2">
+              <li key={idx} className="flex items-center gap-1.5">
                 <button
                   type="button"
                   onClick={() => toggleDone(idx)}
                   disabled={!unlocked}
                   aria-label={item.done ? "إلغاء العلامة" : "تعليم كمنجز"}
-                  className={`size-5 rounded-md flex items-center justify-center shrink-0 transition-all border ${
+                  className={`size-4 rounded flex items-center justify-center shrink-0 transition-all border ${
                     item.done
                       ? "text-primary-foreground"
                       : "bg-card border-border-strong hover:border-primary"
@@ -723,7 +754,7 @@ function UpdateCard({
                       : undefined
                   }
                 >
-                  {item.done && <Check className="size-3.5" strokeWidth={3} />}
+                  {item.done && <Check className="size-3" strokeWidth={3} />}
                 </button>
                 <input
                   ref={(el) => {
@@ -735,8 +766,8 @@ function UpdateCard({
                   onBlur={handleItemBlur}
                   onKeyDown={(e) => handleKeyDown(e, idx)}
                   disabled={!unlocked}
-                  placeholder="اكتب التحديث أو الخطأ..."
-                  className={`flex-1 min-w-0 bg-transparent text-sm focus:outline-none border-b border-transparent focus:border-border py-1 leading-relaxed transition-colors disabled:opacity-60 ${
+                  placeholder="اكتب الملاحظة..."
+                  className={`flex-1 min-w-0 bg-transparent text-[13px] focus:outline-none border-b border-transparent focus:border-border py-0.5 leading-relaxed transition-colors disabled:opacity-60 ${
                     item.done ? "line-through text-muted-foreground" : "text-foreground"
                   }`}
                 />
@@ -744,10 +775,10 @@ function UpdateCard({
                   <button
                     type="button"
                     onClick={() => removeItem(idx)}
-                    className="opacity-40 hover:opacity-100 hover:text-[var(--status-fail)] size-6 flex items-center justify-center transition-opacity shrink-0"
+                    className="opacity-30 hover:opacity-100 hover:text-[var(--status-fail)] size-5 flex items-center justify-center transition-opacity shrink-0"
                     aria-label="حذف العنصر"
                   >
-                    <Trash2 className="size-3.5" />
+                    <Trash2 className="size-3" />
                   </button>
                 )}
               </li>
@@ -760,14 +791,15 @@ function UpdateCard({
             type="button"
             onClick={addItem}
             disabled={!unlocked}
-            className="text-xs tag-mono flex items-center gap-1.5 hover:opacity-80 disabled:opacity-40 disabled:cursor-not-allowed transition-opacity"
+            className="text-[11px] tag-mono flex items-center gap-1 hover:opacity-80 disabled:opacity-40 disabled:cursor-not-allowed transition-opacity"
             style={{ color: meta.color }}
           >
-            <Plus className="size-3" /> إضافة عنصر
+            <Plus className="size-3" /> عنصر
           </button>
           {savePending && (
             <div className="flex items-center gap-1.5 text-[10px] tag-mono text-primary animate-pulse">
-              <Loader2 className="size-3 animate-spin" /> Saving...
+              <Loader2 className="size-3 animate-spin" />
+              Saving...
             </div>
           )}
         </div>
