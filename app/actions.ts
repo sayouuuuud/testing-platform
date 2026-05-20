@@ -176,11 +176,8 @@ export async function updateItemStatus(
     const patch: Record<string, unknown> = {
       status,
       updated_at: new Date().toISOString(),
-    }
-    // Auto-attribute the row to the editor when it's still unassigned.
-    if (!prev?.tester_name) {
-      patch.tester_name = profile.display_name
-      patch.tester_id = profile.id
+      tester_name: profile.display_name,
+      tester_id: profile.id,
     }
 
     const { error } = await supabase
@@ -534,10 +531,18 @@ export async function inviteUser(args: {
     const cleanName = (args.display_name ?? "").trim()
     const svc = createServiceClient()
 
-    const hdrs = await headers()
-    const proto = hdrs.get("x-forwarded-proto") ?? "https"
-    const host = hdrs.get("host") ?? ""
-    const redirectTo = host ? `${proto}://${host}/auth/set-password` : undefined
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL
+    let redirectTo: string | undefined
+    if (siteUrl) {
+      redirectTo = `${siteUrl.replace(/\/$/, "")}/auth/set-password`
+    } else {
+      const hdrs = await headers()
+      const proto = hdrs.get("x-forwarded-proto") ?? "https"
+      const host = hdrs.get("host") ?? ""
+      if (host && !host.startsWith("localhost")) {
+        redirectTo = `${proto}://${host}/auth/set-password`
+      }
+    }
 
     const { data, error } = await svc.auth.admin.inviteUserByEmail(cleanEmail, {
       data: cleanName ? { display_name: cleanName } : undefined,
