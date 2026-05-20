@@ -34,3 +34,19 @@ export interface TestPhase {
   notes: string | null
   sections: TestSection[]
 }
+
+export interface TesterUpdateItem {
+  text: string
+  done: boolean
+}
+
+export type TesterUpdateCategory = "update" | "general_error"
+
+export interface TesterUpdate {
+  id: number
+  category: TesterUpdateCategory
+  tester_name: string
+  items: TesterUpdateItem[]
+  created_at: string
+  updated_at: string
+}

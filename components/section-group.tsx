@@ -1,11 +1,11 @@
 "use client"
 
-import { useState, useTransition } from "react"
+import { useState } from "react"
 import type { TestItem, TestSection } from "@/lib/types"
 import { ChecklistItem } from "./checklist-item"
-import { MessageSquareText, Plus, Minus, Loader2 } from "lucide-react"
+import { MessageSquareText, Plus, Minus } from "lucide-react"
 import { updateSectionNotes } from "@/app/actions"
-import { toast } from "sonner"
+import { NotesChecklist } from "./notes-checklist"
 
 type Props = {
   section: TestSection
@@ -21,23 +21,7 @@ export function SectionGroup({ section, unlocked, onLocalUpdate }: Props) {
   const total = section.items.length
   const pct = total > 0 ? Math.round((doneCount / total) * 100) : 0
 
-  const [notes, setNotes] = useState(section.notes ?? "")
   const [showNotes, setShowNotes] = useState(!!section.notes)
-  const [savePending, startSaveTransition] = useTransition()
-
-  const handleSaveNotes = () => {
-    if (!unlocked) return
-    if (notes.trim() === (section.notes?.trim() ?? "")) return
-
-    startSaveTransition(async () => {
-      const res = await updateSectionNotes(section.id, notes.trim() || null)
-      if (res.ok) {
-        toast.success("تم حفظ ملاحظات القسم")
-      } else {
-        toast.error(res.error || "فشل حفظ ملاحظات القسم")
-      }
-    })
-  }
 
   return (
     <div className="flex flex-col">
@@ -97,24 +81,15 @@ export function SectionGroup({ section, unlocked, onLocalUpdate }: Props) {
         </div>
 
         {showNotes && (
-          <div className="mt-3 animate-in fade-in slide-in-from-top-1 duration-200 space-y-2">
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              onBlur={handleSaveNotes}
-              disabled={!unlocked || savePending}
-              rows={2}
-              placeholder="أضف ملاحظات عن هذا السيكشن (يتم الحفظ تلقائياً عند النقر خارج المربع)..."
-              className="w-full bg-card border border-border rounded-md px-4 py-2.5 text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/15 disabled:opacity-50 resize-y leading-relaxed transition-all"
+          <div className="mt-3 animate-in fade-in slide-in-from-top-1 duration-200">
+            <NotesChecklist
+              initialValue={section.notes}
+              unlocked={unlocked}
+              onSave={(value) => updateSectionNotes(section.id, value)}
+              addLabel="إضافة ملاحظة للسيكشن"
+              emptyLabel="لا توجد ملاحظات بعد"
+              compact
             />
-            {savePending && (
-              <div className="flex justify-end">
-                <div className="flex items-center gap-1.5 text-[10px] tag-mono text-primary animate-pulse">
-                  <Loader2 className="size-3 animate-spin" />
-                  Saving section notes...
-                </div>
-              </div>
-            )}
           </div>
         )}
       </div>

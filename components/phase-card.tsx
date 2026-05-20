@@ -1,12 +1,12 @@
 "use client"
 
-import { useEffect, useMemo, useState, useTransition } from "react"
-import { ChevronDown, MessageSquareText, Loader2, Plus, Minus } from "lucide-react"
+import { useMemo, useState } from "react"
+import { ChevronDown, MessageSquareText, Plus, Minus } from "lucide-react"
 import type { ItemStatus, TestItem, TestPhase } from "@/lib/types"
 import { PHASE_LABELS } from "@/lib/status-config"
 import { SectionGroup } from "./section-group"
 import { updatePhaseNotes } from "@/app/actions"
-import { toast } from "sonner"
+import { NotesChecklist } from "./notes-checklist"
 
 type Props = {
   phase: TestPhase
@@ -23,26 +23,14 @@ export function PhaseCard({
   query,
   onLocalUpdate,
 }: Props) {
-  const [open, setOpen] = useState(phase.order_num === 1)
-  const [notes, setNotes] = useState(phase.notes ?? "")
+  // `userOpen` reflects what the user explicitly chose. Filtering may
+  // *display* the phase as open without mutating this — see displayOpen.
+  const [userOpen, setUserOpen] = useState(false)
   const [showNotes, setShowNotes] = useState(!!phase.notes)
-  const [savePending, startSaveTransition] = useTransition()
-
-  const handleSaveNotes = () => {
-    if (!unlocked) return
-    if (notes.trim() === (phase.notes?.trim() ?? "")) return
-
-    startSaveTransition(async () => {
-      const res = await updatePhaseNotes(phase.id, notes.trim() || null)
-      if (res.ok) {
-        toast.success("تم حفظ ملاحظات المرحلة")
-      } else {
-        toast.error(res.error || "فشل حفظ ملاحظات المرحلة")
-      }
-    })
-  }
 
   const kicker = PHASE_LABELS[phase.color_key]?.kicker ?? "MODULE"
+
+  const isFiltering = statusFilter !== "all" || query.trim() !== ""
 
   const { total, done, pass, fail, pct, filteredSections } = useMemo(() => {
     let total = 0,
@@ -77,17 +65,13 @@ export function PhaseCard({
     return { total, done, pass, fail, pct, filteredSections }
   }, [phase.sections, statusFilter, query])
 
-  const hidden =
-    filteredSections.length === 0 && (statusFilter !== "all" || query.trim() !== "")
+  const hidden = filteredSections.length === 0 && isFiltering
 
-  // Auto-expand phases when a filter or search is active so the user
-  // sees the matching items immediately without having to click each header.
-  useEffect(() => {
-    const isFiltering = statusFilter !== "all" || query.trim() !== ""
-    if (isFiltering && filteredSections.length > 0) {
-      setOpen(true)
-    }
-  }, [statusFilter, query, filteredSections.length])
+  // When filtering is active and this phase has matching sections, surface
+  // them automatically — but only *display* it as open. We never mutate the
+  // user's chosen state, so clearing the filter returns each phase to its
+  // pre-filter open/closed state.
+  const displayOpen = userOpen || (isFiltering && filteredSections.length > 0)
 
   if (hidden) return null
 
@@ -99,9 +83,11 @@ export function PhaseCard({
       <header
         role="button"
         tabIndex={0}
-        aria-expanded={open}
-        onClick={() => setOpen((v) => !v)}
-        onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && setOpen((v) => !v)}
+        aria-expanded={displayOpen}
+        onClick={() => setUserOpen(() => !displayOpen)}
+        onKeyDown={(e) =>
+          (e.key === "Enter" || e.key === " ") && setUserOpen(() => !displayOpen)
+        }
         className="w-full cursor-pointer select-none transition-colors hover:bg-muted/50"
       >
         <div className="flex items-stretch">
@@ -166,7 +152,7 @@ export function PhaseCard({
 
             <ChevronDown
               className={`size-5 text-muted-foreground transition-transform duration-300 ${
-                open ? "rotate-180" : ""
+                displayOpen ? "rotate-180" : ""
               }`}
             />
           </div>
@@ -193,7 +179,7 @@ export function PhaseCard({
       </header>
 
       {/* ── Expanded body ── */}
-      {open && (
+      {displayOpen && (
         <div className="border-t border-border bg-[color-mix(in_oklch,var(--background)_50%,var(--card))]">
           <div className="px-5 lg:px-8 py-3 border-b border-border/50 bg-muted/10">
             <div className="flex items-center justify-between gap-4">
@@ -211,24 +197,14 @@ export function PhaseCard({
             </div>
 
             {showNotes && (
-              <div className="mt-4 animate-in fade-in slide-in-from-top-2 duration-300 space-y-2">
-                <textarea
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  onBlur={handleSaveNotes}
-                  disabled={!unlocked || savePending}
-                  rows={3}
-                  placeholder="أضف ملاحظات عامة حول هذا القسم (Phase)... يتم الحفظ تلقائياً عند النقر خارج المربع."
-                  className="w-full bg-card border border-border rounded-md px-4 py-3 text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/15 disabled:opacity-50 resize-y leading-relaxed transition-all"
+              <div className="mt-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                <NotesChecklist
+                  initialValue={phase.notes}
+                  unlocked={unlocked}
+                  onSave={(value) => updatePhaseNotes(phase.id, value)}
+                  addLabel="إضافة ملاحظة للمرحلة"
+                  emptyLabel="لا توجد ملاحظات بعد — أضف أول عنصر لتتبع ما يخص هذه المرحلة"
                 />
-                {savePending && (
-                  <div className="flex justify-end">
-                    <div className="flex items-center gap-1.5 text-[10px] tag-mono text-primary animate-pulse">
-                      <Loader2 className="size-3 animate-spin" />
-                      Saving phase notes...
-                    </div>
-                  </div>
-                )}
               </div>
             )}
           </div>

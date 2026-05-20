@@ -2,16 +2,22 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
-import type { TestItem, TestPhase, ItemStatus } from "@/lib/types"
+import type { TestItem, TestPhase, ItemStatus, TesterUpdate } from "@/lib/types"
 import { ChecklistHeader } from "./checklist-header"
 import { PhaseCard } from "./phase-card"
+import { TesterUpdatesFab } from "./tester-updates-fab"
 
 type Props = {
   initialPhases: TestPhase[]
   initialUnlocked: boolean
+  initialTesterUpdates: TesterUpdate[]
 }
 
-export function ChecklistApp({ initialPhases, initialUnlocked }: Props) {
+export function ChecklistApp({
+  initialPhases,
+  initialUnlocked,
+  initialTesterUpdates,
+}: Props) {
   const [phases, setPhases] = useState<TestPhase[]>(initialPhases)
   const [unlocked, setUnlocked] = useState(initialUnlocked)
   const [statusFilter, setStatusFilter] = useState<ItemStatus | "all">("all")
@@ -25,8 +31,8 @@ export function ChecklistApp({ initialPhases, initialUnlocked }: Props) {
       .on(
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "test_items" },
-        (payload) => {
-          const updated = payload.new as TestItem
+        (payload: { new: Record<string, unknown> }) => {
+          const updated = payload.new as unknown as TestItem
           setPhases((prev) =>
             prev.map((ph) => ({
               ...ph,
@@ -166,6 +172,11 @@ export function ChecklistApp({ initialPhases, initialUnlocked }: Props) {
           </div>
         </div>
       </footer>
+
+      <TesterUpdatesFab
+        initialUpdates={initialTesterUpdates}
+        unlocked={unlocked}
+      />
     </div>
   )
 }
