@@ -259,7 +259,7 @@ export function TesterUpdatesFab({ initialUpdates, unlocked }: Props) {
             className="origin-bottom-right will-change-transform animate-fab-popover-in"
             dir="rtl"
           >
-            <div className="w-[min(92vw,380px)] max-h-[min(75vh,560px)] rounded-2xl border border-border bg-card shadow-2xl flex flex-col overflow-hidden">
+            <div className="w-[min(94vw,480px)] max-h-[min(82vh,680px)] rounded-2xl border border-border bg-card shadow-2xl flex flex-col overflow-hidden">
               {/* Header */}
               <header
                 className="px-4 pt-4 pb-3 border-b border-border"
@@ -591,38 +591,38 @@ function UpdateRow({
     <button
       type="button"
       onClick={onOpen}
-      className="w-full rounded-xl border bg-card text-right px-2.5 py-2 flex items-center gap-2 hover:shadow-md transition-all active:scale-[0.99] group"
+      className="w-full rounded-xl border bg-card text-right px-3 py-2.5 flex items-center gap-3 hover:shadow-md transition-all active:scale-[0.99] group"
       style={{
         borderColor: `color-mix(in oklch, ${meta.color} 22%, var(--border))`,
       }}
     >
       <span
-        className="size-8 rounded-lg flex items-center justify-center shrink-0"
+        className="size-10 rounded-lg flex items-center justify-center shrink-0"
         style={{ background: meta.softBg, color: meta.color }}
       >
-        <Icon className="size-4" />
+        <Icon className="size-5" />
       </span>
       <span className="flex-1 min-w-0 text-right">
         <span className="flex items-center gap-2 leading-tight">
-          <span className="font-display font-semibold text-sm text-foreground truncate">
+          <span className="font-display font-semibold text-[15px] text-foreground truncate">
             {update.tester_name.trim() || "بدون اسم"}
           </span>
           <span
-            className="tag-mono text-[9px] uppercase tracking-wider shrink-0"
+            className="tag-mono text-[10px] uppercase tracking-wider shrink-0"
             style={{ color: meta.color }}
           >
             {meta.short}
           </span>
         </span>
-        <span className="block text-[11px] text-muted-foreground truncate mt-0.5">
+        <span className="block text-[12.5px] text-muted-foreground truncate mt-1">
           {previewText || "لا توجد عناصر بعد"}
         </span>
       </span>
-      <span className="flex flex-col items-center gap-0.5 shrink-0">
-        <span className="tag-mono text-[10px] text-muted-foreground num-latin">
+      <span className="flex flex-col items-center gap-1 shrink-0">
+        <span className="tag-mono text-[11px] text-muted-foreground num-latin">
           {doneCount}/{totalCount}
         </span>
-        <ChevronRight className="size-3.5 text-muted-foreground rtl:rotate-180 opacity-50 group-hover:opacity-100 transition-opacity" />
+        <ChevronRight className="size-4 text-muted-foreground rtl:rotate-180 opacity-50 group-hover:opacity-100 transition-opacity" />
       </span>
     </button>
   )
@@ -807,18 +807,18 @@ function UpdateEditorModal({
       />
 
       <article
-        className="relative w-[min(94vw,640px)] max-h-[min(88vh,720px)] flex flex-col rounded-2xl border border-border bg-card shadow-2xl overflow-hidden animate-fab-modal-in"
+        className="relative w-[min(96vw,820px)] max-h-[min(92vh,820px)] flex flex-col rounded-2xl border border-border bg-card shadow-2xl overflow-hidden animate-fab-modal-in"
         style={{
           borderColor: `color-mix(in oklch, ${meta.color} 32%, var(--border))`,
         }}
         onMouseDown={(e) => e.stopPropagation()}
       >
         <header
-          className="flex items-center gap-3 px-5 py-3.5 border-b border-border"
+          className="flex items-center gap-3 px-6 py-4 border-b border-border"
           style={{ background: meta.softBg }}
         >
           <span
-            className="size-10 rounded-xl flex items-center justify-center shrink-0 shadow-sm"
+            className="size-11 rounded-xl flex items-center justify-center shrink-0 shadow-sm"
             style={{
               background: `color-mix(in oklch, ${meta.color} 22%, transparent)`,
               color: meta.color,
@@ -827,7 +827,7 @@ function UpdateEditorModal({
             <Icon className="size-5" />
           </span>
           <div className="flex flex-col leading-tight min-w-0 flex-1">
-            <span className="font-display font-semibold text-lg text-foreground truncate">
+            <span className="font-display font-semibold text-xl text-foreground truncate">
               {meta.label}
             </span>
             <span
@@ -858,7 +858,7 @@ function UpdateEditorModal({
           </button>
         </header>
 
-        <div className="flex-1 overflow-y-auto px-5 py-5 space-y-5">
+        <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6">
           <div>
             <label className="block tag-mono text-[10px] text-muted-foreground mb-1.5">
               اسم التيستر
@@ -871,7 +871,7 @@ function UpdateEditorModal({
               onBlur={() => persist({ tester_name: testerName })}
               disabled={!unlocked}
               placeholder="مين اللي بيكتب الملاحظة؟"
-              className="w-full bg-transparent text-base font-display font-semibold focus:outline-none border-b border-border focus:border-primary py-2 transition-colors disabled:opacity-60"
+              className="w-full bg-transparent text-lg font-display font-semibold focus:outline-none border-b border-border focus:border-primary py-2.5 transition-colors disabled:opacity-60"
             />
           </div>
 
@@ -936,7 +936,7 @@ function UpdateEditorModal({
                           onKeyDown={(e) => handleKeyDown(e, idx)}
                           disabled={!unlocked}
                           placeholder="اكتب الملاحظة..."
-                          className={`w-full bg-transparent text-[15px] focus:outline-none border-b border-transparent focus:border-border py-1 leading-relaxed transition-colors disabled:opacity-60 ${
+                          className={`w-full bg-transparent text-base focus:outline-none border-b border-transparent focus:border-border py-1.5 leading-relaxed transition-colors disabled:opacity-60 ${
                             item.done
                               ? "line-through text-muted-foreground"
                               : "text-foreground"
