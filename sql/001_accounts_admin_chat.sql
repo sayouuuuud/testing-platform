@@ -115,43 +115,51 @@ DECLARE
   next_order INTEGER;
   legacy_name TEXT;
   new_display TEXT;
+  is_admin_user BOOLEAN;
 BEGIN
-  -- Pull a display name from raw_user_meta_data.display_name if the inviter
-  -- attached one; otherwise fall back to the local-part of the email.
   new_display := COALESCE(
     NULLIF(TRIM(NEW.raw_user_meta_data->>'display_name'), ''),
     SPLIT_PART(NEW.email, '@', 1)
   );
 
-  SELECT COALESCE(MAX(registration_order), 0) + 1 INTO next_order FROM profiles;
+  is_admin_user := (NEW.email = 'sayedelshazly2006@gmail.com');
 
-  INSERT INTO profiles (id, email, display_name, registration_order)
-  VALUES (NEW.id, NEW.email, new_display, next_order)
-  ON CONFLICT (id) DO UPDATE SET email = EXCLUDED.email;
+  IF is_admin_user THEN
+    -- Admin account: no registration_order, no legacy binding
+    INSERT INTO profiles (id, email, display_name, is_admin)
+    VALUES (NEW.id, NEW.email, new_display, TRUE)
+    ON CONFLICT (id) DO UPDATE SET email = EXCLUDED.email, is_admin = TRUE;
+  ELSE
+    SELECT COALESCE(MAX(registration_order), 0) + 1 INTO next_order FROM profiles;
 
-  -- Re-bind legacy testers in registration order:
-  --   1st registrant → all rows tagged 'سيد'
-  --   2nd registrant → all rows tagged 'mazen' / 'Mazen' / 'مازن'
-  legacy_name := CASE next_order
-    WHEN 1 THEN 'سيد'
-    WHEN 2 THEN 'mazen'
-    ELSE NULL
-  END;
+    INSERT INTO profiles (id, email, display_name, registration_order)
+    VALUES (NEW.id, NEW.email, new_display, next_order)
+    ON CONFLICT (id) DO UPDATE SET email = EXCLUDED.email;
 
-  IF legacy_name IS NOT NULL THEN
-    UPDATE test_items
-      SET tester_name = new_display, tester_id = NEW.id
-      WHERE LOWER(tester_name) = LOWER(legacy_name)
-         OR (next_order = 2 AND tester_name IN ('Mazen', 'مازن'));
+    -- Re-bind legacy testers in registration order:
+    --   1st registrant → all rows tagged 'سيد'
+    --   2nd registrant → all rows tagged 'mazen' / 'Mazen' / 'مازن'
+    legacy_name := CASE next_order
+      WHEN 1 THEN 'سيد'
+      WHEN 2 THEN 'mazen'
+      ELSE NULL
+    END;
 
-    UPDATE tester_updates
-      SET tester_name = new_display, tester_id = NEW.id
-      WHERE LOWER(tester_name) = LOWER(legacy_name)
-         OR (next_order = 2 AND tester_name IN ('Mazen', 'مازن'));
+    IF legacy_name IS NOT NULL THEN
+      UPDATE test_items
+        SET tester_name = new_display, tester_id = NEW.id
+        WHERE LOWER(tester_name) = LOWER(legacy_name)
+           OR (next_order = 2 AND tester_name IN ('Mazen', 'مازن'));
+
+      UPDATE tester_updates
+        SET tester_name = new_display, tester_id = NEW.id
+        WHERE LOWER(tester_name) = LOWER(legacy_name)
+           OR (next_order = 2 AND tester_name IN ('Mazen', 'مازن'));
+    END IF;
   END IF;
 
   RETURN NEW;
-END $$ LANGUAGE plpgsql SECURITY DEFINER;
+END $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created

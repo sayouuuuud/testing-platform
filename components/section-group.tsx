@@ -1,13 +1,15 @@
 "use client"
 
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import type { TestItem, TestSection } from "@/lib/types"
 import { ChecklistItem } from "./checklist-item"
-import { MessageSquareText, Plus, Minus } from "lucide-react"
+import { ChevronLeft, ChevronRight, MessageSquareText, Plus, Minus } from "lucide-react"
 import { updateSectionNotes } from "@/app/actions"
 import { NotesChecklist } from "./notes-checklist"
 import { useSectionNotesPresence } from "./presence/item-presence-context"
 import { EditingBadge } from "./presence/editing-badge"
+
+const PAGE_SIZE = 10
 
 type Props = {
   section: TestSection
@@ -24,6 +26,13 @@ export function SectionGroup({ section, unlocked, onLocalUpdate }: Props) {
   const pct = total > 0 ? Math.round((doneCount / total) * 100) : 0
 
   const [showNotes, setShowNotes] = useState(!!section.notes)
+  const [page, setPage] = useState(0)
+
+  const totalPages = Math.ceil(total / PAGE_SIZE)
+  const pagedItems = useMemo(
+    () => section.items.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE),
+    [section.items, page],
+  )
 
   return (
     <div className="flex flex-col">
@@ -99,7 +108,7 @@ export function SectionGroup({ section, unlocked, onLocalUpdate }: Props) {
       </div>
 
       <ul className="divide-y divide-border/70">
-        {section.items.map((item) => (
+        {pagedItems.map((item) => (
           <ChecklistItem
             key={item.id}
             item={item}
@@ -108,6 +117,30 @@ export function SectionGroup({ section, unlocked, onLocalUpdate }: Props) {
           />
         ))}
       </ul>
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-3 py-3 border-t border-border/50 bg-muted/10">
+          <button
+            type="button"
+            onClick={() => setPage((p) => Math.max(0, p - 1))}
+            disabled={page === 0}
+            className="size-8 rounded-md flex items-center justify-center border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+          >
+            <ChevronRight className="size-4" />
+          </button>
+          <span className="tag-mono num-latin text-muted-foreground text-xs">
+            {page + 1} / {totalPages}
+          </span>
+          <button
+            type="button"
+            onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+            disabled={page >= totalPages - 1}
+            className="size-8 rounded-md flex items-center justify-center border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+          >
+            <ChevronLeft className="size-4" />
+          </button>
+        </div>
+      )}
     </div>
   )
 }
