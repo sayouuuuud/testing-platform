@@ -108,19 +108,18 @@ function formatItemDate(iso?: string): string {
 }
 
 /** Builds a plain-text bundle from a list of cards, grouped by card and
- *  separated by blank lines. Empty items are skipped. Returns "" when
- *  there's nothing to copy. */
+ *  separated by blank lines. Done (struck-through) items and empty items
+ *  are both skipped. Returns "" when there's nothing to copy. */
 function formatUpdatesForCopy(list: TesterUpdate[]): string {
   const groups: string[] = []
   for (const u of list) {
     const meta = CATEGORY_META[u.category]
     const lines = u.items
-      .filter((it) => it.text.trim() !== "")
+      .filter((it) => !it.done && it.text.trim() !== "")
       .map((it) => {
-        const mark = it.done ? "☑" : "☐"
         const date = formatItemDate(it.created_at)
         const dateSuffix = date ? ` — ${date}` : ""
-        return `${mark} ${it.text.trim()}${dateSuffix}`
+        return `- ${it.text.trim()}${dateSuffix}`
       })
     if (lines.length === 0) continue
     const header = `[${meta.label}] ${u.tester_name.trim() || "بدون اسم"}:`
@@ -930,6 +929,24 @@ function UpdateEditorModal({
               {meta.short} · {doneCount}/{totalCount}
             </span>
           </div>
+          <button
+            type="button"
+            onClick={async () => {
+              const text = formatUpdatesForCopy([update])
+              if (!text) {
+                toast.error("لا توجد عناصر للنسخ")
+                return
+              }
+              const ok = await copyToClipboard(text)
+              if (ok) toast.success("تم نسخ كل عناصر البطاقة")
+              else toast.error("تعذر النسخ")
+            }}
+            className="size-9 rounded-lg hover:bg-foreground/5 flex items-center justify-center transition-colors text-muted-foreground hover:text-foreground"
+            aria-label="نسخ كل عناصر البطاقة"
+            title="نسخ كل عناصر البطاقة"
+          >
+            <ClipboardCopy className="size-4" />
+          </button>
           {unlocked && (
             <button
               type="button"
