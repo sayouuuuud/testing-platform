@@ -1,24 +1,14 @@
 "use client"
 
-import { useState, useTransition, useEffect } from "react"
-import { Lock, LockOpen, Search, X, FileDown, Moon, Sun } from "lucide-react"
+import { useState, useEffect } from "react"
+import { Search, FileDown, Moon, Sun } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
-import { Label } from "@/components/ui/label"
 import { useTheme } from "next-themes"
-import { lockEditor, unlockEditor } from "@/app/actions"
 import { toast } from "sonner"
-import type { ItemStatus, TestPhase } from "@/lib/types"
+import type { ItemStatus, Profile, TestPhase } from "@/lib/types"
 import { STATUS_CONFIG } from "@/lib/status-config"
 import { generateMarkdownReport, downloadMarkdown } from "@/lib/export-utils"
+import { UserMenu } from "@/components/auth/user-menu"
 
 type Stats = {
   pending: number
@@ -33,8 +23,7 @@ type Stats = {
 
 type Props = {
   stats: Stats
-  unlocked: boolean
-  onUnlockChange: (next: boolean) => void
+  profile: Profile | null
   statusFilter: ItemStatus | "all"
   onStatusFilterChange: (s: ItemStatus | "all") => void
   query: string
@@ -44,17 +33,13 @@ type Props = {
 
 export function ChecklistHeader({
   stats,
-  unlocked,
-  onUnlockChange,
+  profile,
   statusFilter,
   onStatusFilterChange,
   query,
   onQueryChange,
   phases,
 }: Props) {
-  const [dialogOpen, setDialogOpen] = useState(false)
-  const [password, setPassword] = useState("")
-  const [pending, startTransition] = useTransition()
   const [exporting, setExporting] = useState(false)
   const { resolvedTheme, setTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
@@ -68,34 +53,12 @@ export function ChecklistHeader({
     try {
       const md = generateMarkdownReport(phases)
       downloadMarkdown(md)
-      toast.success("تم تصدير التقرير بصيغة Markdown ✅")
+      toast.success("تم تصدير التقرير بصيغة Markdown")
     } catch {
       toast.error("حدث خطأ أثناء التصدير")
     } finally {
       setExporting(false)
     }
-  }
-
-  const handleUnlock = () => {
-    startTransition(async () => {
-      const res = await unlockEditor(password)
-      if (res.ok) {
-        onUnlockChange(true)
-        setDialogOpen(false)
-        setPassword("")
-        toast.success("تم فتح وضع التعديل")
-      } else {
-        toast.error(res.error || "كلمة المرور غير صحيحة")
-      }
-    })
-  }
-
-  const handleLock = () => {
-    startTransition(async () => {
-      await lockEditor()
-      onUnlockChange(false)
-      toast.success("تم قفل التعديل")
-    })
   }
 
   const statusPills: { key: ItemStatus; count: number }[] = [
@@ -325,64 +288,7 @@ export function ChecklistHeader({
             <span className="tag-mono hidden sm:inline">تصدير .md</span>
           </Button>
 
-          {unlocked ? (
-            <Button
-              onClick={handleLock}
-              disabled={pending}
-              className="gap-2 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 px-5 h-10"
-            >
-              <LockOpen className="size-4" />
-              <span className="tag-mono">محرّر مفعّل</span>
-            </Button>
-          ) : (
-            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-              <DialogTrigger asChild>
-                <Button
-                  variant="outline"
-                  className="gap-2 rounded-md border-border-strong hover:border-primary hover:text-primary transition-all px-5 h-10 bg-transparent"
-                >
-                  <Lock className="size-4" />
-                  <span className="tag-mono">فتح التعديل</span>
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-md rounded-lg" dir="rtl">
-                <DialogHeader>
-                  <div className="eyebrow" style={{ color: "var(--gold)" }}>
-                    Authorization
-                  </div>
-                  <DialogTitle className="font-display text-3xl mt-2">
-                    فتح وضع التعديل
-                  </DialogTitle>
-                  <DialogDescription className="text-muted-foreground leading-relaxed">
-                    أدخل كلمة المرور المشتركة لتتمكن من تحديث حالات البنود وإضافة ملاحظات.
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-2 pt-4">
-                  <Label htmlFor="editor-password" className="tag-mono text-muted-foreground">
-                    Password
-                  </Label>
-                  <input
-                    id="editor-password"
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleUnlock()}
-                    className="w-full bg-background border border-border rounded-md px-4 py-3 text-base focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
-                    autoFocus
-                  />
-                </div>
-                <DialogFooter className="pt-4">
-                  <Button
-                    onClick={handleUnlock}
-                    disabled={pending || !password}
-                    className="w-full rounded-md bg-primary text-primary-foreground hover:bg-primary/90 h-11"
-                  >
-                    تأكيد الدخول
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-          )}
+          <UserMenu profile={profile} />
         </div>
       </div>
     </header>

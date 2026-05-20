@@ -1,6 +1,6 @@
 "use client"
 
-import { useRef, useState, useTransition } from "react"
+import { useEffect, useState, useTransition } from "react"
 import {
   Check,
   ChevronDown,
@@ -20,6 +20,12 @@ import {
   updateItemStatus,
 } from "@/app/actions"
 import { toast } from "sonner"
+import {
+  useItemPresence,
+  usePresenceActions,
+} from "@/components/presence/item-presence-context"
+import { EditingBadge } from "@/components/presence/editing-badge"
+import { TimeAgo } from "@/components/time-ago"
 
 type Props = {
   item: TestItem
@@ -41,24 +47,36 @@ export function ChecklistItem({ item, unlocked, onLocalUpdate }: Props) {
   const [savePending, startSaveTransition] = useTransition()
 
   const [notes, setNotes] = useState(item.notes ?? "")
-  const [testerName, setTesterName] = useState(item.tester_name ?? "")
   const [errorDesc, setErrorDesc] = useState(item.error_description ?? "")
   const [errorCode, setErrorCode] = useState(item.error_code ?? "")
+
+  const presence = useItemPresence(item.id)
+  const { setActive } = usePresenceActions()
+
+  // Broadcast presence while the row is expanded.
+  useEffect(() => {
+    if (!expanded || !unlocked) return
+    setActive({ kind: "item", id: item.id })
+    return () => setActive(null)
+  }, [expanded, unlocked, item.id, setActive])
 
   const cfg = STATUS_CONFIG[item.status]
 
   const handleStatusChange = (next: ItemStatus) => {
     if (!unlocked) {
-      toast.error("التعديل مقفول — افتحه من الأعلى")
+      toast.error("سجل دخول الأول عشان تعدل")
       return
     }
     if (next === item.status) return
     const prev = item.status
-    onLocalUpdate(item.id, { status: next })
+    const prevUpdated = item.updated_at
+    // Optimistic update — bump updated_at immediately so the UI doesn't
+    // wait for the realtime echo before refreshing the "Last updated" cell.
+    onLocalUpdate(item.id, { status: next, updated_at: new Date().toISOString() })
     startStatusTransition(async () => {
       const res = await updateItemStatus(item.id, next)
       if (!res.ok) {
-        onLocalUpdate(item.id, { status: prev })
+        onLocalUpdate(item.id, { status: prev, updated_at: prevUpdated })
         toast.error(res.error || "فشل التحديث")
       }
     })
@@ -69,15 +87,12 @@ export function ChecklistItem({ item, unlocked, onLocalUpdate }: Props) {
 
     const payload = {
       notes: notes.trim() || null,
-      tester_name: testerName.trim() || null,
       error_description: errorDesc.trim() || null,
       error_code: errorCode.trim() || null,
     }
 
-    // Check if anything actually changed
     const hasChanged =
       payload.notes !== (item.notes ?? null) ||
-      payload.tester_name !== (item.tester_name ?? null) ||
       payload.error_description !== (item.error_description ?? null) ||
       payload.error_code !== (item.error_code ?? null)
 
@@ -86,8 +101,7 @@ export function ChecklistItem({ item, unlocked, onLocalUpdate }: Props) {
     startSaveTransition(async () => {
       const res = await updateItemFields(item.id, payload)
       if (res.ok) {
-        onLocalUpdate(item.id, payload)
-        toast.success("تم التحديث تلقائياً")
+        onLocalUpdate(item.id, { ...payload, updated_at: new Date().toISOString() })
       } else {
         toast.error(res.error || "فشل الحفظ التلقائي")
       }
@@ -206,6 +220,18 @@ export function ChecklistItem({ item, unlocked, onLocalUpdate }: Props) {
                   {statusPending && (
                     <Loader2 className="size-3 animate-spin text-muted-foreground" />
                   )}
+
+                  {item.tester_name && (
+                    <span
+                      className="tag-mono flex items-center gap-1 text-muted-foreground"
+                      title="آخر تيستر عدل على البند"
+                    >
+                      <User className="size-3" />
+                      {item.tester_name}
+                    </span>
+                  )}
+
+                  <EditingBadge entries={presence} />
                 </div>
 
                 <p className="text-[15px] lg:text-base text-foreground leading-relaxed">
@@ -270,25 +296,25 @@ export function ChecklistItem({ item, unlocked, onLocalUpdate }: Props) {
                   <User className="size-3" />
                   Tester
                 </label>
-                <input
-                  type="text"
-                  value={testerName}
-                  onChange={(e) => setTesterName(e.target.value)}
-                  onBlur={handleSaveDetails}
-                  disabled={!unlocked}
-                  placeholder="اكتب اسمك..."
-                  className="w-full bg-card border border-border rounded-md px-4 py-2.5 text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/15 disabled:opacity-50 transition-all"
-                />
+                <div className="w-full bg-card border border-border rounded-md px-4 py-2.5 text-sm flex items-center justify-between gap-2">
+                  <span className="text-foreground/80">
+                    {item.tester_name || <span className="text-muted-foreground italic">غير محدد</span>}
+                  </span>
+                  <span className="tag-mono text-[10px] text-muted-foreground">بروفايل</span>
+                </div>
               </div>
               <div className="space-y-2">
                 <label className="tag-mono text-muted-foreground">
                   Last updated
                 </label>
-                <div className="font-mono text-sm text-foreground/80 bg-card border border-border rounded-md px-4 py-2.5 num-latin">
-                  {new Date(item.updated_at).toLocaleString("en-GB", {
-                    dateStyle: "medium",
-                    timeStyle: "short",
-                  })}
+                <div className="font-mono text-sm text-foreground/80 bg-card border border-border rounded-md px-4 py-2.5 num-latin flex items-center justify-between gap-2">
+                  <span>
+                    {new Date(item.updated_at).toLocaleString("en-GB", {
+                      dateStyle: "medium",
+                      timeStyle: "short",
+                    })}
+                  </span>
+                  <TimeAgo iso={item.updated_at} className="text-[10px] text-muted-foreground" />
                 </div>
               </div>
             </div>

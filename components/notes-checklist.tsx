@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState, useTransition } from "react"
+import { useCallback, useEffect, useRef, useState, useTransition } from "react"
 import { Check, Loader2, Plus, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 import {
@@ -8,6 +8,10 @@ import {
   serializeChecklistNotes,
   type ChecklistNoteItem,
 } from "@/lib/notes-checklist"
+import {
+  type PresenceTarget,
+  usePresenceActions,
+} from "@/components/presence/item-presence-context"
 
 type Props = {
   initialValue: string | null
@@ -17,6 +21,7 @@ type Props = {
   emptyLabel?: string
   itemPlaceholder?: string
   compact?: boolean
+  presenceTarget?: PresenceTarget | null
 }
 
 export function NotesChecklist({
@@ -27,6 +32,7 @@ export function NotesChecklist({
   emptyLabel = "لا توجد ملاحظات بعد",
   itemPlaceholder = "اكتب الملاحظة...",
   compact,
+  presenceTarget = null,
 }: Props) {
   const [items, setItems] = useState<ChecklistNoteItem[]>(() =>
     parseChecklistNotes(initialValue),
@@ -36,7 +42,25 @@ export function NotesChecklist({
     serializeChecklistNotes(parseChecklistNotes(initialValue)),
   )
   const focusIndexRef = useRef<number | null>(null)
-  const inputRefs = useRef<Array<HTMLInputElement | null>>([])
+  const inputRefs = useRef<Array<HTMLTextAreaElement | null>>([])
+  const { setActive } = usePresenceActions()
+  const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const broadcastTyping = useCallback(() => {
+    if (!presenceTarget) return
+    setActive(presenceTarget, true)
+    if (typingTimerRef.current) clearTimeout(typingTimerRef.current)
+    typingTimerRef.current = setTimeout(() => {
+      setActive(presenceTarget, false)
+    }, 1500)
+  }, [presenceTarget, setActive])
+
+  // Auto-resize a textarea to fit its content.
+  const autosize = (el: HTMLTextAreaElement | null) => {
+    if (!el) return
+    el.style.height = "auto"
+    el.style.height = `${el.scrollHeight}px`
+  }
 
   // Sync from upstream (e.g. another tab via realtime) when the value
   // actually changes — but never clobber the user mid-edit.
@@ -60,9 +84,23 @@ export function NotesChecklist({
     const el = inputRefs.current[idx]
     if (el) {
       el.focus()
+      autosize(el)
     }
     focusIndexRef.current = null
   }, [items.length])
+
+  // Re-autosize every textarea whenever the items change so wrapping stays
+  // accurate after re-renders.
+  useEffect(() => {
+    for (const el of inputRefs.current) autosize(el)
+  }, [items])
+
+  useEffect(() => {
+    return () => {
+      if (typingTimerRef.current) clearTimeout(typingTimerRef.current)
+      if (presenceTarget) setActive(null, false)
+    }
+  }, [presenceTarget, setActive])
 
   const persist = (next: ChecklistNoteItem[]) => {
     if (!unlocked) return
@@ -118,12 +156,13 @@ export function NotesChecklist({
       setItems(trimmed)
     }
     persist(trimmed)
+    if (presenceTarget) setActive(null, false)
   }
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, idx: number) => {
-    if (e.key === "Enter") {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>, idx: number) => {
+    if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault()
-      // Persist current state, then add a new row.
+      // Persist current state, then add a new row. Shift+Enter inserts a line break inside the current item.
       persist(items)
       focusIndexRef.current = idx + 1
       setItems((prev) => [
@@ -163,7 +202,7 @@ export function NotesChecklist({
       ) : (
         <ul className="space-y-1.5">
           {items.map((item, idx) => (
-            <li key={idx} className={`flex items-center ${sizes.gap}`}>
+            <li key={idx} className={`flex items-start ${sizes.gap}`}>
               <button
                 type="button"
                 onClick={() => toggleDone(idx)}
@@ -177,18 +216,26 @@ export function NotesChecklist({
               >
                 {item.done && <Check className={`${sizes.icon}`} strokeWidth={3} />}
               </button>
-              <input
+              <textarea
                 ref={(el) => {
                   inputRefs.current[idx] = el
+                  autosize(el)
                 }}
-                type="text"
+                rows={1}
                 value={item.text}
-                onChange={(e) => updateText(idx, e.target.value)}
+                onChange={(e) => {
+                  updateText(idx, e.target.value)
+                  autosize(e.currentTarget)
+                  broadcastTyping()
+                }}
+                onFocus={() => {
+                  if (presenceTarget) setActive(presenceTarget, false)
+                }}
                 onBlur={handleBlur}
                 onKeyDown={(e) => handleKeyDown(e, idx)}
                 disabled={!unlocked}
                 placeholder={itemPlaceholder}
-                className={`flex-1 min-w-0 bg-transparent ${sizes.text} focus:outline-none border-b border-transparent focus:border-border py-1 leading-relaxed transition-colors disabled:opacity-60 ${
+                className={`flex-1 min-w-0 bg-transparent ${sizes.text} focus:outline-none border-b border-transparent focus:border-border py-1 leading-relaxed transition-colors disabled:opacity-60 resize-none overflow-hidden break-words whitespace-pre-wrap ${
                   item.done ? "line-through text-muted-foreground" : "text-foreground"
                 }`}
               />
