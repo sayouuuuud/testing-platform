@@ -7,6 +7,7 @@ import {
   Calendar,
   Check,
   ChevronRight,
+  ClipboardCopy,
   Loader2,
   NotebookPen,
   Plus,
@@ -104,6 +105,55 @@ function formatItemDate(iso?: string): string {
   const hours = String(d.getHours()).padStart(2, "0")
   const minutes = String(d.getMinutes()).padStart(2, "0")
   return `${day}/${month} · ${hours}:${minutes}`
+}
+
+/** Builds a plain-text bundle from a list of cards, grouped by card and
+ *  separated by blank lines. Empty items are skipped. Returns "" when
+ *  there's nothing to copy. */
+function formatUpdatesForCopy(list: TesterUpdate[]): string {
+  const groups: string[] = []
+  for (const u of list) {
+    const meta = CATEGORY_META[u.category]
+    const lines = u.items
+      .filter((it) => it.text.trim() !== "")
+      .map((it) => {
+        const mark = it.done ? "☑" : "☐"
+        const date = formatItemDate(it.created_at)
+        const dateSuffix = date ? ` — ${date}` : ""
+        return `${mark} ${it.text.trim()}${dateSuffix}`
+      })
+    if (lines.length === 0) continue
+    const header = `[${meta.label}] ${u.tester_name.trim() || "بدون اسم"}:`
+    groups.push([header, ...lines].join("\n"))
+  }
+  return groups.join("\n\n")
+}
+
+/** Writes text to the clipboard with a legacy fallback for non-secure
+ *  contexts where navigator.clipboard is unavailable. */
+async function copyToClipboard(text: string): Promise<boolean> {
+  try {
+    if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text)
+      return true
+    }
+  } catch {
+    // Fall through to the legacy textarea fallback.
+  }
+  try {
+    const textarea = document.createElement("textarea")
+    textarea.value = text
+    textarea.setAttribute("readonly", "")
+    textarea.style.position = "absolute"
+    textarea.style.left = "-9999px"
+    document.body.appendChild(textarea)
+    textarea.select()
+    const ok = document.execCommand("copy")
+    document.body.removeChild(textarea)
+    return ok
+  } catch {
+    return false
+  }
 }
 
 export function TesterUpdatesFab({ initialUpdates, unlocked }: Props) {
@@ -206,6 +256,27 @@ export function TesterUpdatesFab({ initialUpdates, unlocked }: Props) {
     () => (activeId === null ? null : updates.find((u) => u.id === activeId) ?? null),
     [updates, activeId],
   )
+
+  const handleCopyFiltered = async () => {
+    const list = filter === "all" ? updates : updates.filter((u) => u.category === filter)
+    const text = formatUpdatesForCopy(list)
+    if (!text) {
+      toast.error("لا توجد عناصر للنسخ")
+      return
+    }
+    const ok = await copyToClipboard(text)
+    if (!ok) {
+      toast.error("تعذر النسخ — افتح المتصفح في وضع HTTPS")
+      return
+    }
+    toast.success(
+      filter === "all"
+        ? "تم نسخ كل العناصر"
+        : filter === "update"
+        ? "تم نسخ كل التحديثات"
+        : "تم نسخ كل الأخطاء",
+    )
+  }
 
   const handleCreate = async (category: TesterUpdateCategory) => {
     setPicker(false)
@@ -358,6 +429,28 @@ export function TesterUpdatesFab({ initialUpdates, unlocked }: Props) {
                 <span className="tag-mono text-[10px] text-muted-foreground num-latin">
                   {counts.total} بطاقة · {counts.openItems} عنصر مفتوح
                 </span>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={handleCopyFiltered}
+                    className="size-9 rounded-full hover:bg-muted flex items-center justify-center transition-colors text-muted-foreground hover:text-foreground"
+                    aria-label={
+                      filter === "all"
+                        ? "نسخ كل العناصر"
+                        : filter === "update"
+                        ? "نسخ كل التحديثات"
+                        : "نسخ كل الأخطاء"
+                    }
+                    title={
+                      filter === "all"
+                        ? "نسخ كل العناصر (تحديثات + أخطاء)"
+                        : filter === "update"
+                        ? "نسخ كل عناصر التحديثات"
+                        : "نسخ كل عناصر الأخطاء"
+                    }
+                  >
+                    <ClipboardCopy className="size-4" />
+                  </button>
                 <div className="relative">
                   {picker && (
                     <div
@@ -416,6 +509,7 @@ export function TesterUpdatesFab({ initialUpdates, unlocked }: Props) {
                     />
                     إضافة
                   </button>
+                </div>
                 </div>
               </footer>
             </div>
