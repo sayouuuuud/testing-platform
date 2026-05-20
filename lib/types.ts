@@ -38,6 +38,10 @@ export interface TestPhase {
 export interface TesterUpdateItem {
   text: string
   done: boolean
+  /** ISO timestamp of when this item was first added. Optional for
+   *  backward compatibility with rows that were stored before this
+   *  field existed. */
+  created_at?: string
 }
 
 export type TesterUpdateCategory = "update" | "general_error"

@@ -145,7 +145,13 @@ function normalizeItems(items: unknown): TesterUpdateItem[] {
       const obj = raw as Record<string, unknown>
       const text = typeof obj.text === "string" ? obj.text : ""
       const done = obj.done === true
-      out.push({ text, done })
+      const created_at =
+        typeof obj.created_at === "string" && obj.created_at.length > 0
+          ? obj.created_at
+          : undefined
+      const item: TesterUpdateItem = { text, done }
+      if (created_at) item.created_at = created_at
+      out.push(item)
     }
   }
   return out
