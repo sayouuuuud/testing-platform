@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState, useTransition } from "react"
 import {
   AlertOctagon,
   Bug,
+  Calendar,
   Check,
   ChevronRight,
   Loader2,
@@ -37,7 +38,6 @@ type CategoryMeta = {
   icon: typeof Sparkles
   color: string
   softBg: string
-  ringBg: string
 }
 
 const CATEGORY_META: Record<TesterUpdateCategory, CategoryMeta> = {
@@ -47,7 +47,6 @@ const CATEGORY_META: Record<TesterUpdateCategory, CategoryMeta> = {
     icon: Sparkles,
     color: "var(--primary)",
     softBg: "color-mix(in oklch, var(--primary) 14%, transparent)",
-    ringBg: "color-mix(in oklch, var(--primary) 32%, transparent)",
   },
   general_error: {
     label: "أخطاء عامة",
@@ -55,7 +54,6 @@ const CATEGORY_META: Record<TesterUpdateCategory, CategoryMeta> = {
     icon: AlertOctagon,
     color: "var(--status-fail)",
     softBg: "color-mix(in oklch, var(--status-fail) 14%, transparent)",
-    ringBg: "color-mix(in oklch, var(--status-fail) 32%, transparent)",
   },
 }
 
@@ -67,10 +65,14 @@ function normalizeItems(value: unknown): TesterUpdateItem[] {
   for (const raw of value) {
     if (raw && typeof raw === "object") {
       const obj = raw as Record<string, unknown>
-      out.push({
+      const item: TesterUpdateItem = {
         text: typeof obj.text === "string" ? obj.text : "",
         done: obj.done === true,
-      })
+      }
+      if (typeof obj.created_at === "string" && obj.created_at.length > 0) {
+        item.created_at = obj.created_at
+      }
+      out.push(item)
     }
   }
   return out
@@ -91,12 +93,26 @@ function normalizeRow(row: Record<string, unknown>): TesterUpdate {
   }
 }
 
+/** Returns "DD/MM · HH:MM" (24-hour) for an ISO timestamp — no year.
+ *  Returns an empty string if the timestamp is missing or invalid. */
+function formatItemDate(iso?: string): string {
+  if (!iso) return ""
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ""
+  const day = String(d.getDate()).padStart(2, "0")
+  const month = String(d.getMonth() + 1).padStart(2, "0")
+  const hours = String(d.getHours()).padStart(2, "0")
+  const minutes = String(d.getMinutes()).padStart(2, "0")
+  return `${day}/${month} · ${hours}:${minutes}`
+}
+
 export function TesterUpdatesFab({ initialUpdates, unlocked }: Props) {
   const [open, setOpen] = useState(false)
   const [updates, setUpdates] = useState<TesterUpdate[]>(initialUpdates)
   const [filter, setFilter] = useState<FilterKey>("all")
-  // null = no picker; otherwise shows the inline category picker.
   const [picker, setPicker] = useState(false)
+  // Which card is currently expanded in the centered modal editor.
+  const [activeId, setActiveId] = useState<number | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
 
   // Realtime sync — pick up rows added/edited/deleted in other tabs.
@@ -135,10 +151,15 @@ export function TesterUpdatesFab({ initialUpdates, unlocked }: Props) {
     }
   }, [])
 
-  // Close the entire popover on outside click / Escape.
+  // Outside-click & Escape:
+  //   * If modal is open → close only the modal first.
+  //   * Else close the popover.
+  // The modal renders OUTSIDE containerRef (it's a centered overlay), so we
+  // skip the outside-click check whenever the modal is up.
   useEffect(() => {
     if (!open) return
     const handlePointer = (e: MouseEvent) => {
+      if (activeId !== null) return
       if (!containerRef.current) return
       if (!containerRef.current.contains(e.target as Node)) {
         setOpen(false)
@@ -146,7 +167,10 @@ export function TesterUpdatesFab({ initialUpdates, unlocked }: Props) {
       }
     }
     const handleKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
+      if (e.key !== "Escape") return
+      if (activeId !== null) {
+        setActiveId(null)
+      } else {
         setOpen(false)
         setPicker(false)
       }
@@ -157,7 +181,7 @@ export function TesterUpdatesFab({ initialUpdates, unlocked }: Props) {
       window.removeEventListener("mousedown", handlePointer)
       window.removeEventListener("keydown", handleKey)
     }
-  }, [open])
+  }, [open, activeId])
 
   const filteredUpdates = useMemo(() => {
     if (filter === "all") return updates
@@ -178,6 +202,11 @@ export function TesterUpdatesFab({ initialUpdates, unlocked }: Props) {
     return { updateCount, errorCount, total: updates.length, openItems }
   }, [updates])
 
+  const activeUpdate = useMemo(
+    () => (activeId === null ? null : updates.find((u) => u.id === activeId) ?? null),
+    [updates, activeId],
+  )
+
   const handleCreate = async (category: TesterUpdateCategory) => {
     setPicker(false)
     if (!unlocked) {
@@ -186,12 +215,13 @@ export function TesterUpdatesFab({ initialUpdates, unlocked }: Props) {
     }
     const res = await createTesterUpdate(category, "")
     if (res.ok && res.update) {
-      // Realtime will eventually deliver it, but we add it locally for snappiness.
       setUpdates((prev) => {
         if (prev.some((u) => u.id === res.update!.id)) return prev
         return [res.update!, ...prev]
       })
       setFilter(category)
+      // Open the new card straight away in the centered editor modal.
+      setActiveId(res.update.id)
     } else {
       toast.error(res.error || "تعذر إنشاء البطاقة")
     }
@@ -208,6 +238,7 @@ export function TesterUpdatesFab({ initialUpdates, unlocked }: Props) {
     }
     const prev = updates
     setUpdates((curr) => curr.filter((u) => u.id !== id))
+    if (activeId === id) setActiveId(null)
     const res = await deleteTesterUpdate(id)
     if (!res.ok) {
       toast.error(res.error || "تعذر حذف البطاقة")
@@ -216,233 +247,243 @@ export function TesterUpdatesFab({ initialUpdates, unlocked }: Props) {
   }
 
   return (
-    <div
-      ref={containerRef}
-      className="fixed z-50 bottom-6 end-6 flex flex-col items-end gap-3"
-      dir="ltr"
-    >
-      {/* ── Anchored floating popover (replaces the old side-drawer) ── */}
-      {open && (
-        <div
-          className="origin-bottom-right will-change-transform animate-fab-popover-in"
-          dir="rtl"
-        >
-          <div className="w-[min(92vw,380px)] max-h-[min(75vh,560px)] rounded-2xl border border-border bg-card shadow-2xl flex flex-col overflow-hidden backdrop-blur-md">
-            {/* Header */}
-            <header
-              className="px-4 pt-4 pb-3 border-b border-border"
-              style={{
-                background:
-                  "linear-gradient(135deg, color-mix(in oklch, var(--primary) 8%, var(--card)), var(--card))",
-              }}
-            >
-              <div className="flex items-center justify-between gap-3 mb-3">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <span
-                    className="size-9 rounded-lg flex items-center justify-center shrink-0 shadow-sm"
+    <>
+      <div
+        ref={containerRef}
+        className="fixed z-40 bottom-6 end-6 flex flex-col items-end gap-3"
+        dir="ltr"
+      >
+        {/* ── Anchored popover (compact list view) ── */}
+        {open && (
+          <div
+            className="origin-bottom-right will-change-transform animate-fab-popover-in"
+            dir="rtl"
+          >
+            <div className="w-[min(92vw,380px)] max-h-[min(75vh,560px)] rounded-2xl border border-border bg-card shadow-2xl flex flex-col overflow-hidden">
+              {/* Header */}
+              <header
+                className="px-4 pt-4 pb-3 border-b border-border"
+                style={{
+                  background:
+                    "linear-gradient(135deg, color-mix(in oklch, var(--primary) 8%, var(--card)), var(--card))",
+                }}
+              >
+                <div className="flex items-center justify-between gap-3 mb-3">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <span
+                      className="size-9 rounded-lg flex items-center justify-center shrink-0 shadow-sm"
+                      style={{
+                        background:
+                          "linear-gradient(135deg, var(--primary), color-mix(in oklch, var(--primary) 60%, var(--gold)))",
+                        color: "var(--primary-foreground)",
+                      }}
+                    >
+                      <NotebookPen className="size-4" />
+                    </span>
+                    <div className="flex flex-col leading-tight min-w-0">
+                      <span className="font-display font-semibold text-base text-foreground truncate">
+                        دفتر الملاحظات
+                      </span>
+                      <span className="tag-mono text-[9px] text-muted-foreground truncate">
+                        Notepad — Updates &amp; Errors
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOpen(false)
+                      setPicker(false)
+                    }}
+                    className="size-8 rounded-full hover:bg-muted flex items-center justify-center transition-colors shrink-0"
+                    aria-label="إغلاق"
+                  >
+                    <X className="size-4" />
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <FilterPill
+                    active={filter === "all"}
+                    onClick={() => setFilter("all")}
+                    label="الكل"
+                    count={counts.total}
+                  />
+                  <FilterPill
+                    active={filter === "update"}
+                    onClick={() => setFilter("update")}
+                    label="تحديثات"
+                    count={counts.updateCount}
+                    color="var(--primary)"
+                    icon={Sparkles}
+                  />
+                  <FilterPill
+                    active={filter === "general_error"}
+                    onClick={() => setFilter("general_error")}
+                    label="أخطاء"
+                    count={counts.errorCount}
+                    color="var(--status-fail)"
+                    icon={Bug}
+                  />
+                </div>
+              </header>
+
+              {/* List */}
+              <div className="flex-1 overflow-y-auto px-3 py-3 space-y-2 min-h-[160px]">
+                {filteredUpdates.length === 0 ? (
+                  <EmptyState
+                    unlocked={unlocked}
+                    onPick={() => setPicker(true)}
+                    hint={
+                      filter === "all"
+                        ? "لسه ما فيش حاجة هنا"
+                        : filter === "update"
+                        ? "لا توجد تحديثات مسجلة بعد"
+                        : "لا توجد أخطاء عامة مسجلة بعد"
+                    }
+                  />
+                ) : (
+                  filteredUpdates.map((update) => (
+                    <UpdateRow
+                      key={update.id}
+                      update={update}
+                      onOpen={() => setActiveId(update.id)}
+                    />
+                  ))
+                )}
+              </div>
+
+              {/* Footer */}
+              <footer className="border-t border-border bg-card/80 px-3 py-2.5 flex items-center justify-between gap-2">
+                <span className="tag-mono text-[10px] text-muted-foreground num-latin">
+                  {counts.total} بطاقة · {counts.openItems} عنصر مفتوح
+                </span>
+                <div className="relative">
+                  {picker && (
+                    <div
+                      className="absolute bottom-full end-0 mb-2 w-60 rounded-xl border border-border bg-card shadow-2xl p-1.5 origin-bottom-right animate-fab-picker-in"
+                      onMouseDown={(e) => e.stopPropagation()}
+                    >
+                      {(Object.keys(CATEGORY_META) as TesterUpdateCategory[]).map(
+                        (key) => {
+                          const meta = CATEGORY_META[key]
+                          const Icon = meta.icon
+                          return (
+                            <button
+                              key={key}
+                              type="button"
+                              onClick={() => handleCreate(key)}
+                              className="w-full flex items-center gap-2.5 p-2.5 rounded-lg hover:bg-muted transition-colors text-right group"
+                            >
+                              <span
+                                className="size-8 rounded-lg flex items-center justify-center shrink-0 transition-transform group-hover:scale-105"
+                                style={{ background: meta.softBg, color: meta.color }}
+                              >
+                                <Icon className="size-4" />
+                              </span>
+                              <span className="flex-1 min-w-0 text-right">
+                                <span className="block font-display font-semibold text-sm text-foreground">
+                                  {meta.label}
+                                </span>
+                                <span className="block text-[10px] text-muted-foreground leading-tight mt-0.5">
+                                  {key === "update"
+                                    ? "تحسينات وأفكار مستقبلية"
+                                    : "أخطاء غير مرتبطة ببند"}
+                                </span>
+                              </span>
+                              <ChevronRight className="size-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                            </button>
+                          )
+                        },
+                      )}
+                    </div>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => setPicker((v) => !v)}
+                    disabled={!unlocked}
+                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-full text-sm font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-md active:scale-95"
                     style={{
-                      background:
-                        "linear-gradient(135deg, var(--primary), color-mix(in oklch, var(--primary) 60%, var(--gold)))",
+                      background: "var(--primary)",
                       color: "var(--primary-foreground)",
                     }}
                   >
-                    <NotebookPen className="size-4" />
-                  </span>
-                  <div className="flex flex-col leading-tight min-w-0">
-                    <span className="font-display font-semibold text-base text-foreground truncate">
-                      دفتر الملاحظات
-                    </span>
-                    <span className="tag-mono text-[9px] text-muted-foreground truncate">
-                      Notepad — Updates &amp; Errors
-                    </span>
-                  </div>
+                    <Plus
+                      className={`size-3.5 transition-transform duration-200 ${
+                        picker ? "rotate-45" : ""
+                      }`}
+                    />
+                    إضافة
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setOpen(false)
-                    setPicker(false)
-                  }}
-                  className="size-8 rounded-full hover:bg-muted flex items-center justify-center transition-colors shrink-0"
-                  aria-label="إغلاق"
-                >
-                  <X className="size-4" />
-                </button>
-              </div>
-
-              <div className="flex items-center gap-1.5 flex-wrap">
-                <FilterPill
-                  active={filter === "all"}
-                  onClick={() => setFilter("all")}
-                  label="الكل"
-                  count={counts.total}
-                />
-                <FilterPill
-                  active={filter === "update"}
-                  onClick={() => setFilter("update")}
-                  label="تحديثات"
-                  count={counts.updateCount}
-                  color="var(--primary)"
-                  icon={Sparkles}
-                />
-                <FilterPill
-                  active={filter === "general_error"}
-                  onClick={() => setFilter("general_error")}
-                  label="أخطاء"
-                  count={counts.errorCount}
-                  color="var(--status-fail)"
-                  icon={Bug}
-                />
-              </div>
-            </header>
-
-            {/* List */}
-            <div className="flex-1 overflow-y-auto px-3 py-3 space-y-2.5 min-h-[160px]">
-              {filteredUpdates.length === 0 ? (
-                <EmptyState
-                  unlocked={unlocked}
-                  onPick={() => setPicker(true)}
-                  hint={
-                    filter === "all"
-                      ? "لسه ما فيش حاجة هنا"
-                      : filter === "update"
-                      ? "لا توجد تحديثات مسجلة بعد"
-                      : "لا توجد أخطاء عامة مسجلة بعد"
-                  }
-                />
-              ) : (
-                filteredUpdates.map((update) => (
-                  <UpdateCard
-                    key={update.id}
-                    update={update}
-                    unlocked={unlocked}
-                    onLocalUpdate={handleUpdateLocal}
-                    onDelete={handleDelete}
-                  />
-                ))
-              )}
+              </footer>
             </div>
-
-            {/* Footer */}
-            <footer className="border-t border-border bg-card/80 px-3 py-2.5 flex items-center justify-between gap-2">
-              <span className="tag-mono text-[10px] text-muted-foreground num-latin">
-                {counts.total} بطاقة · {counts.openItems} عنصر مفتوح
-              </span>
-              <div className="relative">
-                {/* Inline category picker that slides up above the Add button */}
-                {picker && (
-                  <div
-                    className="absolute bottom-full end-0 mb-2 w-60 rounded-xl border border-border bg-card shadow-2xl p-1.5 origin-bottom-right animate-fab-picker-in"
-                    onMouseDown={(e) => e.stopPropagation()}
-                  >
-                    {(Object.keys(CATEGORY_META) as TesterUpdateCategory[]).map(
-                      (key) => {
-                        const meta = CATEGORY_META[key]
-                        const Icon = meta.icon
-                        return (
-                          <button
-                            key={key}
-                            type="button"
-                            onClick={() => handleCreate(key)}
-                            className="w-full flex items-center gap-2.5 p-2.5 rounded-lg hover:bg-muted transition-colors text-right group"
-                          >
-                            <span
-                              className="size-8 rounded-lg flex items-center justify-center shrink-0 transition-transform group-hover:scale-105"
-                              style={{ background: meta.softBg, color: meta.color }}
-                            >
-                              <Icon className="size-4" />
-                            </span>
-                            <span className="flex-1 min-w-0 text-right">
-                              <span className="block font-display font-semibold text-sm text-foreground">
-                                {meta.label}
-                              </span>
-                              <span className="block text-[10px] text-muted-foreground leading-tight mt-0.5">
-                                {key === "update"
-                                  ? "تحسينات وأفكار مستقبلية"
-                                  : "أخطاء غير مرتبطة ببند"}
-                              </span>
-                            </span>
-                            <ChevronRight className="size-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-                          </button>
-                        )
-                      },
-                    )}
-                  </div>
-                )}
-
-                <button
-                  type="button"
-                  onClick={() => setPicker((v) => !v)}
-                  disabled={!unlocked}
-                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-full text-sm font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-md active:scale-95"
-                  style={{
-                    background: "var(--primary)",
-                    color: "var(--primary-foreground)",
-                  }}
-                >
-                  <Plus
-                    className={`size-3.5 transition-transform duration-200 ${
-                      picker ? "rotate-45" : ""
-                    }`}
-                  />
-                  إضافة
-                </button>
-              </div>
-            </footer>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* ── Floating action button ── */}
-      <button
-        type="button"
-        onClick={() => {
-          if (open) {
-            setOpen(false)
-            setPicker(false)
-          } else {
-            setOpen(true)
-          }
-        }}
-        className="group relative size-14 rounded-2xl shadow-2xl flex items-center justify-center transition-all duration-300 hover:scale-105 active:scale-95 hover:rotate-3"
-        style={{
-          background:
-            "linear-gradient(135deg, var(--primary), color-mix(in oklch, var(--primary) 55%, var(--gold)))",
-          color: "var(--primary-foreground)",
-        }}
-        aria-label={open ? "إغلاق دفتر الملاحظات" : "فتح دفتر الملاحظات"}
-      >
-        {/* Soft glow */}
-        <span
-          aria-hidden
-          className="absolute inset-0 rounded-2xl blur-xl opacity-40 transition-opacity group-hover:opacity-70 -z-10"
+        {/* ── Floating action button ── */}
+        <button
+          type="button"
+          onClick={() => {
+            if (open) {
+              setOpen(false)
+              setPicker(false)
+            } else {
+              setOpen(true)
+            }
+          }}
+          className="group relative size-14 rounded-2xl shadow-2xl flex items-center justify-center transition-all duration-300 hover:scale-105 active:scale-95 hover:rotate-3"
           style={{
             background:
               "linear-gradient(135deg, var(--primary), color-mix(in oklch, var(--primary) 55%, var(--gold)))",
+            color: "var(--primary-foreground)",
           }}
-        />
-
-        <span
-          className={`transition-all duration-300 ${
-            open ? "rotate-90 scale-90" : "rotate-0 scale-100"
-          }`}
+          aria-label={open ? "إغلاق دفتر الملاحظات" : "فتح دفتر الملاحظات"}
         >
-          {open ? <X className="size-5" /> : <NotebookPen className="size-5" />}
-        </span>
-
-        {!open && counts.openItems > 0 && (
           <span
-            className="absolute -top-1.5 -right-1.5 min-w-5 h-5 px-1 rounded-full tag-mono text-[10px] flex items-center justify-center num-latin shadow-md border-2 border-background"
+            aria-hidden
+            className="absolute inset-0 rounded-2xl blur-xl opacity-40 transition-opacity group-hover:opacity-70 -z-10"
             style={{
-              background: "var(--status-fail)",
-              color: "var(--primary-foreground)",
+              background:
+                "linear-gradient(135deg, var(--primary), color-mix(in oklch, var(--primary) 55%, var(--gold)))",
             }}
+          />
+
+          <span
+            className={`transition-all duration-300 ${
+              open ? "rotate-90 scale-90" : "rotate-0 scale-100"
+            }`}
           >
-            {counts.openItems}
+            {open ? <X className="size-5" /> : <NotebookPen className="size-5" />}
           </span>
-        )}
-      </button>
-    </div>
+
+          {!open && counts.openItems > 0 && (
+            <span
+              className="absolute -top-1.5 -right-1.5 min-w-5 h-5 px-1 rounded-full tag-mono text-[10px] flex items-center justify-center num-latin shadow-md border-2 border-background"
+              style={{
+                background: "var(--status-fail)",
+                color: "var(--primary-foreground)",
+              }}
+            >
+              {counts.openItems}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {/* ── Centered editor modal ── */}
+      {activeUpdate && (
+        <UpdateEditorModal
+          key={activeUpdate.id}
+          update={activeUpdate}
+          unlocked={unlocked}
+          onClose={() => setActiveId(null)}
+          onLocalUpdate={handleUpdateLocal}
+          onDelete={handleDelete}
+        />
+      )}
+    </>
   )
 }
 
@@ -531,14 +572,73 @@ function EmptyState({
   )
 }
 
-function UpdateCard({
+// ── Compact row in the popover list — clickable to expand the editor.
+function UpdateRow({
+  update,
+  onOpen,
+}: {
+  update: TesterUpdate
+  onOpen: () => void
+}) {
+  const meta = CATEGORY_META[update.category]
+  const Icon = meta.icon
+  const doneCount = update.items.filter((it) => it.done).length
+  const totalCount = update.items.length
+  const firstItem = update.items.find((it) => it.text.trim() !== "")
+  const previewText = firstItem?.text.trim() ?? ""
+
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="w-full rounded-xl border bg-card text-right px-2.5 py-2 flex items-center gap-2 hover:shadow-md transition-all active:scale-[0.99] group"
+      style={{
+        borderColor: `color-mix(in oklch, ${meta.color} 22%, var(--border))`,
+      }}
+    >
+      <span
+        className="size-8 rounded-lg flex items-center justify-center shrink-0"
+        style={{ background: meta.softBg, color: meta.color }}
+      >
+        <Icon className="size-4" />
+      </span>
+      <span className="flex-1 min-w-0 text-right">
+        <span className="flex items-center gap-2 leading-tight">
+          <span className="font-display font-semibold text-sm text-foreground truncate">
+            {update.tester_name.trim() || "بدون اسم"}
+          </span>
+          <span
+            className="tag-mono text-[9px] uppercase tracking-wider shrink-0"
+            style={{ color: meta.color }}
+          >
+            {meta.short}
+          </span>
+        </span>
+        <span className="block text-[11px] text-muted-foreground truncate mt-0.5">
+          {previewText || "لا توجد عناصر بعد"}
+        </span>
+      </span>
+      <span className="flex flex-col items-center gap-0.5 shrink-0">
+        <span className="tag-mono text-[10px] text-muted-foreground num-latin">
+          {doneCount}/{totalCount}
+        </span>
+        <ChevronRight className="size-3.5 text-muted-foreground rtl:rotate-180 opacity-50 group-hover:opacity-100 transition-opacity" />
+      </span>
+    </button>
+  )
+}
+
+// ── Centered modal: comfortable editor for a single update card.
+function UpdateEditorModal({
   update,
   unlocked,
+  onClose,
   onLocalUpdate,
   onDelete,
 }: {
   update: TesterUpdate
   unlocked: boolean
+  onClose: () => void
   onLocalUpdate: (id: number, patch: Partial<TesterUpdate>) => void
   onDelete: (id: number) => void
 }) {
@@ -559,7 +659,8 @@ function UpdateCard({
   useEffect(() => {
     const incomingItems = JSON.stringify(update.items)
     if (incomingItems === baselineRef.current.items) return
-    const activeEl = typeof document !== "undefined" ? document.activeElement : null
+    const activeEl =
+      typeof document !== "undefined" ? document.activeElement : null
     const isEditingHere = inputRefs.current.some((el) => el === activeEl)
     if (!isEditingHere) {
       setItems(update.items)
@@ -569,7 +670,8 @@ function UpdateCard({
 
   useEffect(() => {
     if (update.tester_name === baselineRef.current.tester_name) return
-    const activeEl = typeof document !== "undefined" ? document.activeElement : null
+    const activeEl =
+      typeof document !== "undefined" ? document.activeElement : null
     if (activeEl?.getAttribute("data-card-name") !== String(update.id)) {
       setTesterName(update.tester_name)
       baselineRef.current.tester_name = update.tester_name
@@ -640,7 +742,10 @@ function UpdateCard({
       return
     }
     focusIndexRef.current = items.length
-    setItems((prev) => [...prev, { text: "", done: false }])
+    setItems((prev) => [
+      ...prev,
+      { text: "", done: false, created_at: new Date().toISOString() },
+    ])
   }
 
   const handleItemBlur = () => {
@@ -661,7 +766,7 @@ function UpdateCard({
       focusIndexRef.current = idx + 1
       setItems((prev) => [
         ...prev.slice(0, idx + 1),
-        { text: "", done: false },
+        { text: "", done: false, created_at: new Date().toISOString() },
         ...prev.slice(idx + 1),
       ])
     } else if (e.key === "Backspace" && items[idx]?.text === "" && items.length > 0) {
@@ -676,134 +781,220 @@ function UpdateCard({
   const doneCount = items.filter((it) => it.done).length
   const totalCount = items.length
 
+  // Lock body scroll while the modal is up.
+  useEffect(() => {
+    const prevOverflow = document.body.style.overflow
+    document.body.style.overflow = "hidden"
+    return () => {
+      document.body.style.overflow = prevOverflow
+    }
+  }, [])
+
   return (
-    <article
-      className="rounded-xl border bg-card overflow-hidden transition-all hover:shadow-md animate-in fade-in slide-in-from-top-1 duration-200"
-      style={{
-        borderColor: `color-mix(in oklch, ${meta.color} 28%, var(--border))`,
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 animate-fab-backdrop-in"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose()
       }}
+      role="dialog"
+      aria-modal="true"
+      dir="rtl"
     >
-      <header
-        className="flex items-center gap-2 px-2.5 py-1.5 border-b border-border"
-        style={{ background: meta.softBg }}
+      {/* Backdrop */}
+      <div
+        aria-hidden
+        className="absolute inset-0 bg-foreground/40 backdrop-blur-sm"
+      />
+
+      <article
+        className="relative w-[min(94vw,640px)] max-h-[min(88vh,720px)] flex flex-col rounded-2xl border border-border bg-card shadow-2xl overflow-hidden animate-fab-modal-in"
+        style={{
+          borderColor: `color-mix(in oklch, ${meta.color} 32%, var(--border))`,
+        }}
+        onMouseDown={(e) => e.stopPropagation()}
       >
-        <span
-          className="size-6 rounded-md flex items-center justify-center shrink-0"
-          style={{
-            background: `color-mix(in oklch, ${meta.color} 24%, transparent)`,
-            color: meta.color,
-          }}
+        <header
+          className="flex items-center gap-3 px-5 py-3.5 border-b border-border"
+          style={{ background: meta.softBg }}
         >
-          <Icon className="size-3" />
-        </span>
-        <span
-          className="tag-mono text-[9px] uppercase tracking-wider"
-          style={{ color: meta.color }}
-        >
-          {meta.short}
-        </span>
-        <span className="tag-mono text-[9px] text-muted-foreground num-latin ms-auto">
-          {doneCount}/{totalCount}
-        </span>
-        {unlocked && (
-          <button
-            type="button"
-            onClick={() => onDelete(update.id)}
-            className="size-6 rounded-md hover:bg-foreground/5 flex items-center justify-center transition-colors text-muted-foreground hover:text-[var(--status-fail)]"
-            aria-label="حذف البطاقة"
-            title="حذف البطاقة"
+          <span
+            className="size-10 rounded-xl flex items-center justify-center shrink-0 shadow-sm"
+            style={{
+              background: `color-mix(in oklch, ${meta.color} 22%, transparent)`,
+              color: meta.color,
+            }}
           >
-            <Trash2 className="size-3" />
-          </button>
-        )}
-      </header>
-
-      <div className="px-2.5 py-2.5 space-y-2">
-        <input
-          type="text"
-          data-card-name={update.id}
-          value={testerName}
-          onChange={(e) => setTesterName(e.target.value)}
-          onBlur={() => persist({ tester_name: testerName })}
-          disabled={!unlocked}
-          placeholder="اسم التيستر..."
-          className="w-full bg-transparent text-sm font-display font-semibold focus:outline-none border-b border-border focus:border-primary py-1 transition-colors disabled:opacity-60"
-        />
-
-        {items.length === 0 ? (
-          <p className="text-[11px] text-muted-foreground italic">
-            اضغط + لإضافة عنصر
-          </p>
-        ) : (
-          <ul className="space-y-1">
-            {items.map((item, idx) => (
-              <li key={idx} className="flex items-center gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => toggleDone(idx)}
-                  disabled={!unlocked}
-                  aria-label={item.done ? "إلغاء العلامة" : "تعليم كمنجز"}
-                  className={`size-4 rounded flex items-center justify-center shrink-0 transition-all border ${
-                    item.done
-                      ? "text-primary-foreground"
-                      : "bg-card border-border-strong hover:border-primary"
-                  } ${!unlocked ? "cursor-not-allowed opacity-60" : "cursor-pointer"}`}
-                  style={
-                    item.done
-                      ? { background: meta.color, borderColor: meta.color }
-                      : undefined
-                  }
-                >
-                  {item.done && <Check className="size-3" strokeWidth={3} />}
-                </button>
-                <input
-                  ref={(el) => {
-                    inputRefs.current[idx] = el
-                  }}
-                  type="text"
-                  value={item.text}
-                  onChange={(e) => updateText(idx, e.target.value)}
-                  onBlur={handleItemBlur}
-                  onKeyDown={(e) => handleKeyDown(e, idx)}
-                  disabled={!unlocked}
-                  placeholder="اكتب الملاحظة..."
-                  className={`flex-1 min-w-0 bg-transparent text-[13px] focus:outline-none border-b border-transparent focus:border-border py-0.5 leading-relaxed transition-colors disabled:opacity-60 ${
-                    item.done ? "line-through text-muted-foreground" : "text-foreground"
-                  }`}
-                />
-                {unlocked && (
-                  <button
-                    type="button"
-                    onClick={() => removeItem(idx)}
-                    className="opacity-30 hover:opacity-100 hover:text-[var(--status-fail)] size-5 flex items-center justify-center transition-opacity shrink-0"
-                    aria-label="حذف العنصر"
-                  >
-                    <Trash2 className="size-3" />
-                  </button>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
-
-        <div className="flex items-center justify-between gap-2">
-          <button
-            type="button"
-            onClick={addItem}
-            disabled={!unlocked}
-            className="text-[11px] tag-mono flex items-center gap-1 hover:opacity-80 disabled:opacity-40 disabled:cursor-not-allowed transition-opacity"
-            style={{ color: meta.color }}
-          >
-            <Plus className="size-3" /> عنصر
-          </button>
-          {savePending && (
-            <div className="flex items-center gap-1.5 text-[10px] tag-mono text-primary animate-pulse">
-              <Loader2 className="size-3 animate-spin" />
-              Saving...
-            </div>
+            <Icon className="size-5" />
+          </span>
+          <div className="flex flex-col leading-tight min-w-0 flex-1">
+            <span className="font-display font-semibold text-lg text-foreground truncate">
+              {meta.label}
+            </span>
+            <span
+              className="tag-mono text-[10px] uppercase tracking-wider"
+              style={{ color: meta.color }}
+            >
+              {meta.short} · {doneCount}/{totalCount}
+            </span>
+          </div>
+          {unlocked && (
+            <button
+              type="button"
+              onClick={() => onDelete(update.id)}
+              className="size-9 rounded-lg hover:bg-foreground/5 flex items-center justify-center transition-colors text-muted-foreground hover:text-[var(--status-fail)]"
+              aria-label="حذف البطاقة"
+              title="حذف البطاقة"
+            >
+              <Trash2 className="size-4" />
+            </button>
           )}
+          <button
+            type="button"
+            onClick={onClose}
+            className="size-9 rounded-lg hover:bg-foreground/5 flex items-center justify-center transition-colors"
+            aria-label="إغلاق"
+          >
+            <X className="size-4" />
+          </button>
+        </header>
+
+        <div className="flex-1 overflow-y-auto px-5 py-5 space-y-5">
+          <div>
+            <label className="block tag-mono text-[10px] text-muted-foreground mb-1.5">
+              اسم التيستر
+            </label>
+            <input
+              type="text"
+              data-card-name={update.id}
+              value={testerName}
+              onChange={(e) => setTesterName(e.target.value)}
+              onBlur={() => persist({ tester_name: testerName })}
+              disabled={!unlocked}
+              placeholder="مين اللي بيكتب الملاحظة؟"
+              className="w-full bg-transparent text-base font-display font-semibold focus:outline-none border-b border-border focus:border-primary py-2 transition-colors disabled:opacity-60"
+            />
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="block tag-mono text-[10px] text-muted-foreground">
+                العناصر
+              </label>
+              {savePending && (
+                <span className="flex items-center gap-1.5 text-[10px] tag-mono text-primary animate-pulse">
+                  <Loader2 className="size-3 animate-spin" />
+                  Saving...
+                </span>
+              )}
+            </div>
+
+            {items.length === 0 ? (
+              <p className="text-sm text-muted-foreground italic py-2">
+                ما فيش عناصر لسه — اضغط + لإضافة أول واحد
+              </p>
+            ) : (
+              <ul className="space-y-1.5">
+                {items.map((item, idx) => {
+                  const dateLabel = formatItemDate(item.created_at)
+                  return (
+                    <li
+                      key={idx}
+                      className="group flex items-start gap-2.5 rounded-lg px-2 py-1.5 hover:bg-muted/40 transition-colors"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => toggleDone(idx)}
+                        disabled={!unlocked}
+                        aria-label={item.done ? "إلغاء العلامة" : "تعليم كمنجز"}
+                        className={`size-5 mt-1 rounded flex items-center justify-center shrink-0 transition-all border ${
+                          item.done
+                            ? "text-primary-foreground"
+                            : "bg-card border-border-strong hover:border-primary"
+                        } ${
+                          !unlocked
+                            ? "cursor-not-allowed opacity-60"
+                            : "cursor-pointer"
+                        }`}
+                        style={
+                          item.done
+                            ? { background: meta.color, borderColor: meta.color }
+                            : undefined
+                        }
+                      >
+                        {item.done && <Check className="size-3.5" strokeWidth={3} />}
+                      </button>
+
+                      <div className="flex-1 min-w-0">
+                        <input
+                          ref={(el) => {
+                            inputRefs.current[idx] = el
+                          }}
+                          type="text"
+                          value={item.text}
+                          onChange={(e) => updateText(idx, e.target.value)}
+                          onBlur={handleItemBlur}
+                          onKeyDown={(e) => handleKeyDown(e, idx)}
+                          disabled={!unlocked}
+                          placeholder="اكتب الملاحظة..."
+                          className={`w-full bg-transparent text-[15px] focus:outline-none border-b border-transparent focus:border-border py-1 leading-relaxed transition-colors disabled:opacity-60 ${
+                            item.done
+                              ? "line-through text-muted-foreground"
+                              : "text-foreground"
+                          }`}
+                        />
+                        {dateLabel && (
+                          <span className="inline-flex items-center gap-1 tag-mono text-[10px] text-muted-foreground num-latin mt-1">
+                            <Calendar className="size-2.5" />
+                            {dateLabel}
+                          </span>
+                        )}
+                      </div>
+
+                      {unlocked && (
+                        <button
+                          type="button"
+                          onClick={() => removeItem(idx)}
+                          className="opacity-0 group-hover:opacity-100 hover:text-[var(--status-fail)] size-7 mt-0.5 flex items-center justify-center transition-opacity shrink-0 rounded-md hover:bg-foreground/5"
+                          aria-label="حذف العنصر"
+                        >
+                          <Trash2 className="size-3.5" />
+                        </button>
+                      )}
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
+
+            <button
+              type="button"
+              onClick={addItem}
+              disabled={!unlocked}
+              className="mt-3 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all disabled:opacity-40 disabled:cursor-not-allowed hover:shadow-sm active:scale-95"
+              style={{
+                color: meta.color,
+                borderColor: `color-mix(in oklch, ${meta.color} 32%, transparent)`,
+                background: `color-mix(in oklch, ${meta.color} 8%, transparent)`,
+              }}
+            >
+              <Plus className="size-3.5" /> إضافة عنصر
+            </button>
+          </div>
         </div>
-      </div>
-    </article>
+
+        <footer className="border-t border-border px-5 py-3 flex items-center justify-between gap-3 bg-card/80">
+          <span className="tag-mono text-[10px] text-muted-foreground">
+            اضغط خارج النافذة أو Escape للإغلاق
+          </span>
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-1.5 rounded-full text-xs font-medium transition-colors hover:bg-muted"
+          >
+            تم
+          </button>
+        </footer>
+      </article>
+    </div>
   )
 }

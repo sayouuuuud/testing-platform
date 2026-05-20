@@ -467,3 +467,25 @@
 .animate-fab-picker-in {
   animation: fab-picker-in 0.18s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
+
+@keyframes fab-backdrop-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.animate-fab-backdrop-in {
+  animation: fab-backdrop-in 0.18s ease-out both;
+}
+
+@keyframes fab-modal-in {
+  0% {
+    opacity: 0;
+    transform: translateY(16px) scale(0.94);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+.animate-fab-modal-in {
+  animation: fab-modal-in 0.26s cubic-bezier(0.22, 1.2, 0.36, 1) both;
+}
