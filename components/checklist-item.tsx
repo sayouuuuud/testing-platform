@@ -147,8 +147,13 @@ export function ChecklistItem({ item, unlocked, onLocalUpdate }: Props) {
         style={
           presence.length > 0
             ? {
-                background: "color-mix(in oklch, var(--gold) 10%, var(--background))",
-                borderInlineStart: "3px solid var(--gold)",
+                background: "color-mix(in oklch, var(--gold) 25%, var(--background))",
+                borderInlineStart: "4px solid var(--gold)",
+                boxShadow: "inset 0 0 0 1px color-mix(in oklch, var(--gold) 30%, transparent)",
+              }
+            : interacting
+            ? {
+                borderInlineStart: "3px solid var(--primary)",
               }
             : undefined
         }
