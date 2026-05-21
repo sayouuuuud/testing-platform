@@ -1,6 +1,7 @@
 import Link from "next/link"
 import { requireAdmin } from "@/lib/auth"
 import { signOut } from "@/app/actions"
+import { ThemeToggle } from "@/components/theme-toggle"
 
 export const dynamic = "force-dynamic"
 
@@ -50,6 +51,7 @@ export default async function AdminLayout({
             </Link>
           </nav>
           <div className="flex-1" />
+          <ThemeToggle />
           <span className="text-xs text-muted-foreground">
             {profile.email}
           </span>
