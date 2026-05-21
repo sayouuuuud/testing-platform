@@ -723,7 +723,10 @@ function UpdateRow({
         <span className="tag-mono text-[11px] text-muted-foreground num-latin">
           {doneCount}/{totalCount}
         </span>
-        <ChevronRight className="size-4 text-muted-foreground rtl:rotate-180 opacity-50 group-hover:opacity-100 transition-opacity" />
+        <TimeAgo
+          iso={update.updated_at}
+          className="tag-mono text-[10px] text-muted-foreground/70 num-latin"
+        />
       </span>
     </button>
   )
