@@ -559,9 +559,15 @@ export async function inviteUser(args: {
       })
       if (linkError) return { ok: false, error: linkError.message }
 
-      const actionLink = linkData?.properties?.action_link
-      if (actionLink) {
-        await sendInviteEmail(cleanEmail, actionLink, cleanName || undefined)
+      const tokenHash = linkData?.properties?.hashed_token
+      const verType = linkData?.properties?.verification_type
+      if (tokenHash) {
+        const hdrs = await headers()
+        const proto = hdrs.get("x-forwarded-proto") ?? "https"
+        const host = hdrs.get("host") ?? ""
+        const baseUrl = siteUrl?.replace(/\/$/, "") || `${proto}://${host}`
+        const callbackLink = `${baseUrl}/auth/callback?token_hash=${tokenHash}&type=${verType ?? "invite"}&next=/auth/set-password`
+        await sendInviteEmail(cleanEmail, callbackLink, cleanName || undefined)
       }
 
       if (linkData?.user && args.is_admin) {
