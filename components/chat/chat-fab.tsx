@@ -29,7 +29,15 @@ export function ChatFab({ initialMessages, profile, testers }: Props) {
   const [showMentions, setShowMentions] = useState(false)
   const [mentionQuery, setMentionQuery] = useState("")
   const [pending, startTransition] = useTransition()
-  const [unread, setUnread] = useState(0)
+  const [unread, setUnread] = useState(() => {
+    if (typeof window === "undefined") return 0
+    const lastRead = localStorage.getItem("chat_last_read")
+    if (!lastRead) return initialMessages.length
+    const ts = new Date(lastRead).getTime()
+    return initialMessages.filter(
+      (m) => new Date(m.created_at).getTime() > ts && m.user_id !== profile.id,
+    ).length
+  })
 
   const inputRef = useRef<HTMLInputElement | null>(null)
   const listRef = useRef<HTMLDivElement | null>(null)
@@ -83,6 +91,7 @@ export function ChatFab({ initialMessages, profile, testers }: Props) {
   useEffect(() => {
     if (!open) return
     setUnread(0)
+    localStorage.setItem("chat_last_read", new Date().toISOString())
     requestAnimationFrame(() => {
       const el = listRef.current
       if (el) el.scrollTop = el.scrollHeight

@@ -53,12 +53,25 @@ export function ChecklistItem({ item, unlocked, onLocalUpdate }: Props) {
   const presence = useItemPresence(item.id)
   const { setActive } = usePresenceActions()
 
-  // Broadcast presence while the row is expanded.
+  const [interacting, setInteracting] = useState(false)
+
+  // Broadcast presence while the user is interacting with this item.
   useEffect(() => {
-    if (!expanded || !unlocked) return
+    if (!interacting || !unlocked) return
     setActive({ kind: "item", id: item.id })
     return () => setActive(null)
-  }, [expanded, unlocked, item.id, setActive])
+  }, [interacting, unlocked, item.id, setActive])
+
+  // Clear interaction when clicking outside this item.
+  useEffect(() => {
+    if (!interacting) return
+    const handler = (e: MouseEvent) => {
+      const li = document.getElementById(`item-${item.id}`)
+      if (li && !li.contains(e.target as Node)) setInteracting(false)
+    }
+    document.addEventListener("mousedown", handler)
+    return () => document.removeEventListener("mousedown", handler)
+  }, [interacting, item.id])
 
   const cfg = STATUS_CONFIG[item.status]
 
@@ -123,7 +136,11 @@ export function ChecklistItem({ item, unlocked, onLocalUpdate }: Props) {
   const accent = cfg.color
 
   return (
-    <li className="group relative">
+    <li
+      id={`item-${item.id}`}
+      className="group relative"
+      onClick={() => { if (unlocked) setInteracting(true) }}
+    >
       {/* Left edge accent bar */}
       <span
         aria-hidden
@@ -138,6 +155,14 @@ export function ChecklistItem({ item, unlocked, onLocalUpdate }: Props) {
         className={`px-5 lg:px-8 py-4 lg:py-5 transition-colors ${
           expanded ? "bg-muted/50" : "hover:bg-muted/30"
         }`}
+        style={
+          presence.length > 0
+            ? {
+                background: "color-mix(in oklch, var(--gold) 10%, var(--background))",
+                borderInlineStart: "3px solid var(--gold)",
+              }
+            : undefined
+        }
       >
         <div className="flex items-start gap-4">
           {/* Status icon button — quick toggle pass */}
