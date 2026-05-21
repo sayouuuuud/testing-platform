@@ -544,14 +544,39 @@ export async function inviteUser(args: {
       }
     }
 
-    const { data, error } = await svc.auth.admin.inviteUserByEmail(cleanEmail, {
-      data: cleanName ? { display_name: cleanName } : undefined,
-      redirectTo,
-    })
-    if (error) return { ok: false, error: error.message }
+    const useCustomSmtp = !!process.env.SMTP_USER
 
-    if (data.user && args.is_admin) {
-      await svc.from("profiles").update({ is_admin: true }).eq("id", data.user.id)
+    if (useCustomSmtp) {
+      const { sendInviteEmail } = await import("@/lib/mail")
+
+      const { data: linkData, error: linkError } = await svc.auth.admin.generateLink({
+        type: "invite",
+        email: cleanEmail,
+        options: {
+          data: cleanName ? { display_name: cleanName } : undefined,
+          redirectTo,
+        },
+      })
+      if (linkError) return { ok: false, error: linkError.message }
+
+      const actionLink = linkData?.properties?.action_link
+      if (actionLink) {
+        await sendInviteEmail(cleanEmail, actionLink, cleanName || undefined)
+      }
+
+      if (linkData?.user && args.is_admin) {
+        await svc.from("profiles").update({ is_admin: true }).eq("id", linkData.user.id)
+      }
+    } else {
+      const { data, error } = await svc.auth.admin.inviteUserByEmail(cleanEmail, {
+        data: cleanName ? { display_name: cleanName } : undefined,
+        redirectTo,
+      })
+      if (error) return { ok: false, error: error.message }
+
+      if (data.user && args.is_admin) {
+        await svc.from("profiles").update({ is_admin: true }).eq("id", data.user.id)
+      }
     }
     revalidatePath("/admin/users")
     return { ok: true }
