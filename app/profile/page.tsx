@@ -1,7 +1,9 @@
-import { requireProfile } from "@/lib/auth"
+import { requireProfile, normalizeProfile } from "@/lib/auth"
 import { createServiceClient } from "@/lib/supabase/server"
 import { ProfilePageClient } from "@/components/profile/profile-page-client"
-import type { ActivityLogEntry, ItemStatus, TestItem, TesterStats } from "@/lib/types"
+import { ChatFab } from "@/components/chat/chat-fab"
+import { listChatMessages } from "@/app/actions"
+import type { ActivityLogEntry, ItemStatus, Profile, TestItem, TesterStats } from "@/lib/types"
 
 export const dynamic = "force-dynamic"
 
@@ -9,7 +11,7 @@ export default async function ProfilePage() {
   const profile = await requireProfile()
   const svc = createServiceClient()
 
-  const [itemsRes, activityRes] = await Promise.all([
+  const [itemsRes, activityRes, chatMessages, testersRes] = await Promise.all([
     svc.from("test_items").select("*").eq("tester_id", profile.id).order("updated_at", { ascending: false }).limit(50),
     svc
       .from("activity_log")
@@ -17,7 +19,16 @@ export default async function ProfilePage() {
       .eq("user_id", profile.id)
       .order("created_at", { ascending: false })
       .limit(30),
+    listChatMessages(),
+    svc
+      .from("profiles")
+      .select("*")
+      .order("registration_order", { ascending: true, nullsFirst: false }),
   ])
+
+  const testers: Profile[] = ((testersRes.data ?? []) as Record<string, unknown>[]).map(
+    normalizeProfile,
+  )
 
   const items = (itemsRes.data ?? []) as TestItem[]
   const activity = (activityRes.data ?? []) as ActivityLogEntry[]
@@ -55,11 +66,18 @@ export default async function ProfilePage() {
   }
 
   return (
-    <ProfilePageClient
-      profile={profile}
-      items={items}
-      activity={activity}
-      stats={stats}
-    />
+    <>
+      <ProfilePageClient
+        profile={profile}
+        items={items}
+        activity={activity}
+        stats={stats}
+      />
+      <ChatFab
+        initialMessages={chatMessages}
+        profile={profile}
+        testers={testers}
+      />
+    </>
   )
 }
