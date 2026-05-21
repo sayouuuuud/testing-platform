@@ -1,20 +1,22 @@
 import nodemailer from "nodemailer"
 
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST ?? "smtp.gmail.com",
-  port: Number(process.env.SMTP_PORT ?? "587"),
-  secure: false,
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
-  },
-})
+const connectionUrl = process.env.SMTP_CONNECTION_URL ?? ""
+const transporter = nodemailer.createTransport(connectionUrl)
 
 const senderName = process.env.SMTP_SENDER_NAME ?? "ITQ Testing"
-const senderEmail = process.env.SMTP_USER ?? ""
+
+function getSenderEmail(): string {
+  try {
+    const url = new URL(connectionUrl)
+    return decodeURIComponent(url.username)
+  } catch {
+    return ""
+  }
+}
 
 export async function sendInviteEmail(to: string, actionLink: string, displayName?: string) {
   const greeting = displayName ? `أهلاً ${displayName}،` : "أهلاً،"
+  const senderEmail = getSenderEmail()
 
   await transporter.sendMail({
     from: `"${senderName}" <${senderEmail}>`,

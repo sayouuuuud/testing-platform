@@ -544,7 +544,7 @@ export async function inviteUser(args: {
       }
     }
 
-    const useCustomSmtp = !!process.env.SMTP_USER
+    const useCustomSmtp = !!process.env.SMTP_CONNECTION_URL
 
     if (useCustomSmtp) {
       const { sendInviteEmail } = await import("@/lib/mail")
