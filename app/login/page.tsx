@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation"
 import { getCurrentProfile } from "@/lib/auth"
 import { LoginForm } from "@/components/auth/login-form"
+import { ThemeToggle } from "@/components/theme-toggle"
 
 export const dynamic = "force-dynamic"
 
@@ -11,7 +12,10 @@ export default async function LoginPage() {
   }
 
   return (
-    <main className="min-h-screen paper-bg flex items-center justify-center px-4 py-12">
+    <main className="min-h-screen paper-bg flex items-center justify-center px-4 py-12 relative">
+      <div className="absolute top-4 left-4">
+        <ThemeToggle />
+      </div>
       <div className="w-full max-w-md">
         <div className="text-center mb-10">
           <div className="eyebrow mb-3" style={{ color: "var(--gold)" }}>
