@@ -62,17 +62,6 @@ export function ChecklistItem({ item, unlocked, onLocalUpdate }: Props) {
     return () => setActive(null)
   }, [interacting, unlocked, item.id, setActive])
 
-  // Clear interaction when clicking outside this item.
-  useEffect(() => {
-    if (!interacting) return
-    const handler = (e: MouseEvent) => {
-      const li = document.getElementById(`item-${item.id}`)
-      if (li && !li.contains(e.target as Node)) setInteracting(false)
-    }
-    document.addEventListener("mousedown", handler)
-    return () => document.removeEventListener("mousedown", handler)
-  }, [interacting, item.id])
-
   const cfg = STATUS_CONFIG[item.status]
 
   const handleStatusChange = (next: ItemStatus) => {
@@ -139,7 +128,7 @@ export function ChecklistItem({ item, unlocked, onLocalUpdate }: Props) {
     <li
       id={`item-${item.id}`}
       className="group relative"
-      onClick={() => { if (unlocked) setInteracting(true) }}
+      onClick={() => { if (unlocked) setInteracting((v) => !v) }}
     >
       {/* Left edge accent bar */}
       <span
