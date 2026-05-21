@@ -120,7 +120,21 @@ export async function updateOwnProfile(
   }
   const { error } = await svc.from("profiles").update(payload).eq("id", profile.id)
   if (error) return { ok: false, error: error.message }
+
+  if (typeof patch.display_name === "string") {
+    const newName = patch.display_name.trim()
+    await svc
+      .from("test_items")
+      .update({ tester_name: newName })
+      .eq("tester_id", profile.id)
+    await svc
+      .from("tester_updates")
+      .update({ tester_name: newName })
+      .eq("tester_id", profile.id)
+  }
+
   revalidatePath("/profile")
+  revalidatePath("/")
   return { ok: true }
 }
 
