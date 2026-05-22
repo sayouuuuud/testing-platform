@@ -138,6 +138,35 @@ export async function updateOwnProfile(
   return { ok: true }
 }
 
+export async function updateOwnEmail(
+  newEmail: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const profile = await requireProfileOrThrow()
+  const svc = createServiceClient()
+  const { error: authError } = await svc.auth.admin.updateUserById(profile.id, {
+    email: newEmail,
+  })
+  if (authError) return { ok: false, error: authError.message }
+  await svc.from("profiles").update({ email: newEmail, updated_at: new Date().toISOString() }).eq("id", profile.id)
+  revalidatePath("/profile")
+  return { ok: true }
+}
+
+export async function adminUpdateUserEmail(
+  userId: string,
+  newEmail: string,
+): Promise<{ ok: boolean; error?: string }> {
+  await requireAdminOrThrow()
+  const svc = createServiceClient()
+  const { error: authError } = await svc.auth.admin.updateUserById(userId, {
+    email: newEmail,
+  })
+  if (authError) return { ok: false, error: authError.message }
+  await svc.from("profiles").update({ email: newEmail, updated_at: new Date().toISOString() }).eq("id", userId)
+  revalidatePath("/admin")
+  return { ok: true }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Visit tracking (best-effort)
 // ─────────────────────────────────────────────────────────────────────────────

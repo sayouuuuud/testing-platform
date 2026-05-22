@@ -3,8 +3,8 @@
 import Link from "next/link"
 import { useState, useTransition } from "react"
 import { toast } from "sonner"
-import { ArrowRight, Loader2, ShieldCheck, User } from "lucide-react"
-import { updateOwnProfile, setOwnPassword } from "@/app/actions"
+import { ArrowRight, ChevronLeft, ChevronRight, Loader2, Mail, ShieldCheck, User } from "lucide-react"
+import { updateOwnProfile, setOwnPassword, updateOwnEmail } from "@/app/actions"
 import { TimeAgo } from "@/components/time-ago"
 import type {
   ActivityLogEntry,
@@ -22,11 +22,16 @@ type Props = {
   stats: TesterStats
 }
 
+const ITEMS_PER_PAGE = 10
+
 export function ProfilePageClient({ profile, items, activity, stats }: Props) {
   const [displayName, setDisplayName] = useState(profile.display_name)
   const [savingName, startNameTransition] = useTransition()
   const [newPassword, setNewPassword] = useState("")
   const [savingPass, startPassTransition] = useTransition()
+  const [newEmail, setNewEmail] = useState(profile.email)
+  const [savingEmail, startEmailTransition] = useTransition()
+  const [itemsPage, setItemsPage] = useState(0)
 
   const handleSaveName = () => {
     startNameTransition(async () => {
@@ -51,6 +56,19 @@ export function ProfilePageClient({ profile, items, activity, stats }: Props) {
       }
     })
   }
+
+  const handleSaveEmail = () => {
+    const trimmed = newEmail.trim().toLowerCase()
+    if (!trimmed || trimmed === profile.email) return
+    startEmailTransition(async () => {
+      const res = await updateOwnEmail(trimmed)
+      if (res.ok) toast.success("تم تحديث البريد — أكد من الإيميل الجديد")
+      else toast.error(res.error || "فشل تحديث البريد")
+    })
+  }
+
+  const pagedItems = items.slice(itemsPage * ITEMS_PER_PAGE, (itemsPage + 1) * ITEMS_PER_PAGE)
+  const totalItemPages = Math.ceil(items.length / ITEMS_PER_PAGE)
 
   return (
     <main className="min-h-screen paper-bg" dir="rtl">
@@ -145,6 +163,30 @@ export function ProfilePageClient({ profile, items, activity, stats }: Props) {
               تحديث الباس
             </button>
           </div>
+
+          <div className="card-paper p-5 space-y-4">
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <Mail className="size-4" />
+              <span className="tag-mono text-[11px] uppercase">تغيير البريد</span>
+            </div>
+            <div className="space-y-2">
+              <label className="tag-mono text-muted-foreground block">البريد الإلكتروني</label>
+              <input
+                type="email"
+                value={newEmail}
+                onChange={(e) => setNewEmail(e.target.value)}
+                className="w-full bg-card border border-border rounded-md px-4 py-2.5 text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
+              />
+            </div>
+            <button
+              onClick={handleSaveEmail}
+              disabled={savingEmail || newEmail.trim().toLowerCase() === profile.email}
+              className="inline-flex items-center gap-2 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 px-5 py-2 text-sm font-medium transition-colors disabled:opacity-60"
+            >
+              {savingEmail && <Loader2 className="size-4 animate-spin" />}
+              تحديث البريد
+            </button>
+          </div>
         </section>
 
         {/* Recent items */}
@@ -162,11 +204,34 @@ export function ProfilePageClient({ profile, items, activity, stats }: Props) {
               لسه مفيش حالات معدّل عليها
             </div>
           ) : (
-            <div className="card-paper divide-y divide-border/70">
-              {items.map((item) => (
-                <ItemRow key={item.id} item={item} />
-              ))}
-            </div>
+            <>
+              <div className="card-paper divide-y divide-border/70">
+                {pagedItems.map((item) => (
+                  <ItemRow key={item.id} item={item} />
+                ))}
+              </div>
+              {totalItemPages > 1 && (
+                <div className="flex items-center justify-center gap-3 pt-2">
+                  <button
+                    onClick={() => setItemsPage((p) => Math.max(0, p - 1))}
+                    disabled={itemsPage === 0}
+                    className="size-8 rounded-md flex items-center justify-center border border-border hover:bg-muted/50 disabled:opacity-40 transition-colors"
+                  >
+                    <ChevronRight className="size-4" />
+                  </button>
+                  <span className="tag-mono text-[11px] text-muted-foreground num-latin">
+                    {itemsPage + 1} / {totalItemPages}
+                  </span>
+                  <button
+                    onClick={() => setItemsPage((p) => Math.min(totalItemPages - 1, p + 1))}
+                    disabled={itemsPage >= totalItemPages - 1}
+                    className="size-8 rounded-md flex items-center justify-center border border-border hover:bg-muted/50 disabled:opacity-40 transition-colors"
+                  >
+                    <ChevronLeft className="size-4" />
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </section>
 
