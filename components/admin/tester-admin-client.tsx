@@ -3,8 +3,8 @@
 import Link from "next/link"
 import { useState, useTransition } from "react"
 import { toast } from "sonner"
-import { ArrowRight, Loader2, ShieldCheck, Trash2 } from "lucide-react"
-import { adminDeleteUser, adminUpdateProfile } from "@/app/actions"
+import { ArrowRight, Loader2, Mail, ShieldCheck, Trash2 } from "lucide-react"
+import { adminDeleteUser, adminUpdateProfile, adminUpdateUserEmail } from "@/app/actions"
 import { TimeAgo } from "@/components/time-ago"
 import type {
   ActivityLogEntry,
@@ -25,7 +25,9 @@ type Props = {
 export function TesterAdminClient({ profile, items, stats, activity }: Props) {
   const [displayName, setDisplayName] = useState(profile.display_name)
   const [isAdmin, setIsAdmin] = useState(profile.is_admin)
+  const [email, setEmail] = useState(profile.email)
   const [savingProfile, startProfileTransition] = useTransition()
+  const [savingEmail, startEmailTransition] = useTransition()
   const [deleting, startDeleteTransition] = useTransition()
 
   const handleSaveProfile = () => {
@@ -100,6 +102,36 @@ export function TesterAdminClient({ profile, items, stats, activity }: Props) {
               onChange={(e) => setDisplayName(e.target.value)}
               className="w-full bg-card border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
             />
+          </div>
+          <div>
+            <label className="tag-mono text-[10px] text-muted-foreground block mb-1 flex items-center gap-1">
+              <Mail className="size-3" />
+              البريد الإلكتروني
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="flex-1 bg-card border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+              />
+              <button
+                onClick={() => {
+                  const trimmed = email.trim().toLowerCase()
+                  if (!trimmed || trimmed === profile.email) return
+                  startEmailTransition(async () => {
+                    const res = await adminUpdateUserEmail(profile.id, trimmed)
+                    if (res.ok) toast.success("تم تحديث البريد")
+                    else toast.error(res.error || "فشل")
+                  })
+                }}
+                disabled={savingEmail || email.trim().toLowerCase() === profile.email}
+                className="inline-flex items-center gap-1 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 px-3 py-2 text-xs font-medium transition-colors disabled:opacity-60 shrink-0"
+              >
+                {savingEmail && <Loader2 className="size-3 animate-spin" />}
+                حفظ
+              </button>
+            </div>
           </div>
           <div className="flex items-end">
             <label className="flex items-center gap-2 text-sm cursor-pointer">
