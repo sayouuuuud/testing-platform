@@ -1,12 +1,14 @@
 "use client"
 
-import { useState, useTransition } from "react"
+import { useMemo, useState, useTransition } from "react"
 import { toast } from "sonner"
-import { Loader2 } from "lucide-react"
+import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react"
 import { adminAssignTester } from "@/app/actions"
 import { TimeAgo } from "@/components/time-ago"
 import type { ItemStatus, Profile, TestItem } from "@/lib/types"
 import { STATUS_CONFIG } from "@/lib/status-config"
+
+const PAGE_SIZE = 10
 
 type Props = {
   items: TestItem[]
@@ -18,6 +20,13 @@ export function UnassignedClient({ items: initialItems, profiles }: Props) {
   const [picking, setPicking] = useState<Record<number, string>>({})
   const [pending, startTransition] = useTransition()
   const [activeId, setActiveId] = useState<number | null>(null)
+  const [page, setPage] = useState(0)
+
+  const totalPages = Math.ceil(items.length / PAGE_SIZE)
+  const pagedItems = useMemo(
+    () => items.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE),
+    [items, page],
+  )
 
   const handleAssign = (item: TestItem) => {
     const testerId = picking[item.id]
@@ -30,7 +39,12 @@ export function UnassignedClient({ items: initialItems, profiles }: Props) {
       const res = await adminAssignTester(item.id, testerId)
       if (res.ok) {
         toast.success("اتعيّن")
-        setItems((prev) => prev.filter((x) => x.id !== item.id))
+        setItems((prev) => {
+          const next = prev.filter((x) => x.id !== item.id)
+          const maxPage = Math.max(0, Math.ceil(next.length / PAGE_SIZE) - 1)
+          if (page > maxPage) setPage(maxPage)
+          return next
+        })
       } else {
         toast.error(res.error || "فشل")
       }
@@ -49,6 +63,9 @@ export function UnassignedClient({ items: initialItems, profiles }: Props) {
         </h1>
         <p className="text-sm text-muted-foreground mt-2">
           الحالات اللي معمول عليها تيست لكن مفيش تيستر معلّم عليها — عيّن واحد ليها.
+          {items.length > 0 && (
+            <span className="tag-mono num-latin ms-2">({items.length} حالة)</span>
+          )}
         </p>
       </div>
 
@@ -58,7 +75,7 @@ export function UnassignedClient({ items: initialItems, profiles }: Props) {
         </div>
       ) : (
         <div className="card-paper divide-y divide-border/70">
-          {items.map((item) => {
+          {pagedItems.map((item) => {
             const cfg = STATUS_CONFIG[item.status as ItemStatus]
             return (
               <div
@@ -117,6 +134,30 @@ export function UnassignedClient({ items: initialItems, profiles }: Props) {
               </div>
             )
           })}
+
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center gap-3 py-3 bg-muted/10">
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.max(0, p - 1))}
+                disabled={page === 0}
+                className="size-8 rounded-md flex items-center justify-center border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+              >
+                <ChevronRight className="size-4" />
+              </button>
+              <span className="tag-mono num-latin text-muted-foreground text-xs">
+                {page + 1} / {totalPages}
+              </span>
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+                disabled={page >= totalPages - 1}
+                className="size-8 rounded-md flex items-center justify-center border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+              >
+                <ChevronLeft className="size-4" />
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>
